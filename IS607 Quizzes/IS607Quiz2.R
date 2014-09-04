@@ -1,22 +1,25 @@
 # Week 2 Quiz (21 Q)
+# Paul Garaud
 
-# Q1
+#### Q1 ####
+set.seed(100)
 num.vect <- floor(runif(20, min = -5, max = 10))
 
-# Q2
+#### Q2 ####
 char.vect <- as.character(num.vect)
 
-# Q3
+#### Q3 ####
 fact.vect <- as.factor(num.vect)
 
-# Q4
+#### Q4 ####
 length(levels(fact.vect))
+# 12
 
-# Q5
+#### Q5 ####
 trans.vect <- sapply(num.vect, FUN = function(x) {3 * x**2 - 4 * x + 1})
 trans.vect2 <- 3 * num.vect**2 - 4 * num.vect + 1
 
-# Q6 Note to self: solve(A) for inverse of A
+#### Q6 Note to self: solve(A) for inverse of A ####
 reg.beta <- function(X, y) {
   X.X <- t(X) %*% X
   Xy <- t(X) %*% y
@@ -31,10 +34,11 @@ y <- c(45.2,46.9,31.0,35.3,25.0,43.1,41.0,35.1)
 
 reg.beta(X, y)
 
-# Q7
+#### Q7 ####
 named <- list(a = 1, other = 'o')
 
-# Q8
+#### Q8 ####
+set.seed(100)
 new.df <- data.frame(chars = letters[1:10],
                      fact = factor(sample(c('thing1','thing2','thing3'), 
                                           size = 10, replace = TRUE)),
@@ -44,64 +48,71 @@ new.df <- data.frame(chars = letters[1:10],
                      stringsAsFactors = FALSE
 )
 
-# Q9
+#### Q9 ####
 fact.var <- new.df[['fact']]
 fact.var2 <- as.factor(c(as.character(fact.var), 'thing4'))
 
-# Q10
+#### Q10 ####
 temp <- read.table(file = './temperatures.csv', sep = ',')
 
-# Q11
+#### Q11 ####
 measures <- read.table(file = 'C:/Users/Paul/Desktop/measurements.txt', sep = '\t')
 
-# Q12 (URL not actually pipe data)
+#### Q12 (URL not actually pipe data) ####
 pipe.data <- read.table(file = 'http://www.realeda.com/PipeDelimitedFormat.htm',
                         sep = '|')  # not actually pipe-delimited file
 
-# Q13
+#### Q13 ####
 twelve.bang <- 1
 for (i in 12:1) {
   twelve.bang <- twelve.bang * i
 }
+# 479001600
 
-# Q14
+#### Q14 ####
 P <- 1500
 int <- .03
 for (i in 1:(6 * 12)) {
   P <- P + P * (int / 12)
 }
 P  <- round(P, digits = 2)
+# 1795.42
 
-# Q15
+#### Q15 ####
+set.seed(100)
 q13.vect <- rcauchy(20)
-third.sum <- sum(q13.vect[seq(from = 1, to = 20, by = 3)])
+third.sum <- sum(q13.vect[seq(from = 3, to = 20, by = 3)])
+# 7.550405
 
-# Q16
+#### Q16 ####
 x <- 0
 for (i in 1:10) {
   x <- x + 2**i
 }
+# 2046
 
-# Q17
+#### Q17 ####
 y <- 0
 j <- 1
 while (j <= 10) {
   y  <- y + 2**j
   j  <-  j + 1
 }
+# 2046
 
-# Q18
+#### Q18 ####
 twos <- rep(2, 10)
 powers.two <- twos**(1:10)
 sum.powers.two <- sum(powers.two)
+# 2046
 
-# Q19
+#### Q19 ####
 seq.by.5 <- seq(from = 20, to = 50, by = 5)
 
-# Q20
+#### Q20 ####
 ten.examples <- rep('example', 10)
 
-# Q21
+#### Q21 ####
 quadratic <- function(a, b, c) {
   plus.numerator <- -b + sqrt(b**2 - 4 * a * c)
   minus.numerator <- -b - sqrt(b**2 - 4 * a * c)
@@ -114,4 +125,6 @@ quadratic <- function(a, b, c) {
   return(c(root1, root2))
 }
 quadratic(1, 2, 1)
+# -1
 quadratic(1, 1, -2)
+# 1 -2
