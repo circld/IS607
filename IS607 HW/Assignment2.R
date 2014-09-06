@@ -40,6 +40,9 @@ quadratic <- function(a, b, c) {
   if (discriminant < 0) {
     stop('No real number solutions.')
   }
+  if (a == 0) {
+    stop('Not a valid quadratic expression.')
+  }
   plus.numerator <- -b + sqrt(discriminant)
   minus.numerator <- -b - sqrt(discriminant)
   denominator <- 2 * a
