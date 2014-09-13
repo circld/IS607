@@ -122,7 +122,7 @@ quad.func <- function(x, y) {
 #### Q6 ####
 # set directory
 base.dir <- getwd()
-setwd(file.path(base.dir, 'IS607Quizzes'))
+try(setwd(file.path(base.dir, 'IS607Quizzes')), silent = TRUE)
 
 price.data <- read.table('week-3-price-data.csv', sep=',', header = TRUE)
 make.data <- read.table('week-3-make-model-data.csv', sep=',', header = TRUE)
@@ -149,11 +149,11 @@ red.price <- subset(price.make2, Color == 'Red' & Price > 10000)
 no.MN.Color <- red.price[, c(-1, -3), with = FALSE]
 
 #### Q11 ####
-char.count <- function(char.vector) {
-  if (class(char.vector) != 'character') {
+char.count <- function(x) {
+  if (class(x) != 'character') {
     stop('Argument must be a character vector')
   }
-  return(sapply(char.vector, nchar))
+  return(sapply(x, function(y) length(strsplit(y, "")[[1]])))
 }
 
 #### Q12 ####
