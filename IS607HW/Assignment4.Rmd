@@ -1,0 +1,103 @@
+## IS607 - Week 4 Assignment
+Paul Garaud
+
+
+### Data
+[Movies dataset](http://had.co.nz/data/movies/) available here.
+
+### Describe how to identify 'best popular' movies across years.
+We take as our starting premise that 'Best' must be a function of the user ratings while 'popular' must be a function of both user ratings and the quantity of user votes. Popularity, if represented soley by the number of votes, would be indistinguishable from *unpopularity* though intuitively these things are, in some sense, opposites (anonymity being a nother possible opposite).
+
+Unfortunately, even 'best' can be problematic if the number of votes are too few--a single utterly enthusiastic could endow a perfect rating upon an otherwise unremarkable film. To mitigate this, we will limit candidates to movies with greater than 100 votes.
+
+Popularity will be defined, in concrete terms, as the z-scored rating (we will de-mean and divide by its standard deviation) and multiply this rating by the number of votes over the mean number of votes. When the rating is low and the number of votes high, the resulting number will be large negative number. Having a below-average quantity of votes will reduce the z-scored rating.
+
+### Preparing for the analysis
+Let us load the data into memory and retain only the columns needed for this analysis:
+```{r load.data, results='hide'}
+require(ggplot2)  # the dataset is also available in ggplot
+data(movies)
+df <- movies[, c('title', 'year', 'rating', 'votes')]
+```
+Once the data is in memory, we must calculate the mean and standard deviation of rating as well as the maximum number of votes for a single movie. We must also remove low-vote movies, the arbitrary cutoff we will use is 100 votes.
+```{r munging}
+df <- df[df$votes > 100, ]
+mean.rating <- mean(df$rating)
+sd.rating <- sd(df$rating)
+max.votes <- max(df$votes)
+```
+We must also create the function that will calculate the transformed score as discussed in the previous section.
+```{r algo.fun, results='hide'}
+transform.rating <- function(row){
+  z.rating <- (as.numeric(row[['rating']]) - mean.rating) / sd.rating  # z-score rating
+  c(bp.rating = z.rating * as.numeric(row[['votes']]))
+}
+```
+Now we can apply this to this `transform.rating` function to the data to find the 'best & popular' films:
+```{r best.popular}
+df['bp.rating'] <- apply(df, 1, transform.rating)
+df <- df[order(df$bp.rating, decreasing = TRUE), ]
+head(df, 10)
+```
+Compare this list to the otherwise top-rated:
+```{r best}
+head(df[order(df$rating, decreasing = TRUE), ], 10)
+```
+
+### Visualizing the difference in year distributions
+How do the two lists above really differ? Let's investigate with pictures. First, let's get it to where we're comparing apples to apples by adding z-scored columns for both ratings. Then, we can visualize how the distributions differ.
+```{r z.scores.density}
+mean.bprating <- mean(df$bp.rating)
+sd.bprating <- sd(df$bp.rating)
+df['z.bprating'] <- apply(df, 1, function(x) (as.numeric(x[['bp.rating']]) - 
+                                                as.numeric(mean.bprating)) /
+                                              as.numeric(sd.bprating))
+df['z.rating'] <- apply(df, 1, function(x) (as.numeric(x[['rating']]) - 
+                                                as.numeric(mean.rating)) /
+                                              as.numeric(sd.rating))
+# We need long format for z-scores for ease of graphing
+require(reshape2)
+long.z <- melt(df[, c('z.rating', 'z.bprating')], variable.name = 'type',
+               value.name='rating')
+# Sanity check: check that the number of rows are equal for both types of rating
+require(plyr)
+daply(long.z, .(type), nrow)
+
+# Graphing the densities
+(densities <- ggplot(long.z, aes(x = rating, fill = type)) +
+  stat_density(alpha = .5))
+
+# That doesn't help much. Zooming in...
+(densities + coord_cartesian(xlim = c(-1, 1), ylim = c(0, 10)))
+```
+We see that the bp.ratings are much more concentrated around zeroClearly, our transformation has greatly increased the kurtosis of the distribution, most likely because the votes distribution has a higher kurtosis. Let's check the vote distribution to be sure:
+
+```{r votes.density}
+ggplot(df, aes(x = votes)) + stat_density() + coord_cartesian(xlim = c(0, 25000))
+```
+
+Perhaps we should have taken this highly skewed (exponential?) distribution into account in our bp.rating algorithm! This could easily have been at least partially ameliorated by by taking the log of votes before z-scoring, etc.
+```{r log.votes.density}
+ggplot(df, aes(x = log(votes))) + stat_density()
+```
+
+### How the two types of ratings change over time
+How have the ratings change by year? Let's compare our z-scored ratings by taking the mean for each rating type for each year and charting the results.
+```{r z.ratings.by.year}
+ratings.by.year <- ddply(.data = df, .variables = .(year), summarize,
+                         mean.bprating = mean(z.bprating),
+                         mean.rating = mean(z.rating))
+
+# long format for plotting
+ratings.by.year.long <- melt(ratings.by.year, id.vars = 'year', 
+                        variable.name = 'type', value.name = 'mean.rating')
+
+# Time series
+ggplot(ratings.by.year.long, aes(x = year, y = mean.rating, group = type,
+                                 color = type)) + 
+  geom_line()
+```
+Looks like the ratings are in fact more stable over time and centered at the average rating for the 'best popular' ratings whereas the regular ratings display a pattern of rating decay over time.
+
+### Conclusions
+The 'best popular' measure should really, time permitting, be calculated using the log-transformed vote count to avoid any extreme influence over its distribution. However, the above analysis points to a different kind of measure for assessing how good and how popular films are.
