@@ -1,0 +1,36 @@
+Week 5 Quiz
+Paul Garaud
+
+Reading Quiz: 'Tidy Data'
+1. tidying
+2. single observation units are in the rows and variables are in the columns
+3. a. column headers are values, not names
+   b. multiple variables are stored in a single column
+   c. variables are stored in both rows and columns (this one is tricky)
+   d. multiple types of observational units are stored in the same table
+(denormalized)
+   e. a single observational unit is stored in multiple tables (sometimes the
+case for very large longitudinal datasets)
+4. filter -  select a subset of rows
+   transform - add another column (variable) or modify existing column
+   aggregate - perform a function over the data partitioned into groups
+   sort - reorder the rows of the data set according to some criteria
+
+Reading Quiz: 'Introduction to dplyr'
+1. advantages: 
+    a. (usefully) constrains the number of functions available to help facilitate thinking around what you want from the data. 
+    b. much faster than plyr
+   disadvantages: 
+    a. only works on data.frames
+    b. plyr better suited for broader data transformation needs
+2. advantages:
+    a. uses sensible naming convention to make it clear what the input and
+output classes will be (eg, dapply takes a dataframe and outputs an array)
+    b. internally consistent function structure makes going from one plyr
+function to another seamless.
+   disadvantages:
+    a. base R has a much wider variety of functions available for specific use cases.
+    b. often faster than plyr
+
+Reading Quiz 'tidyr'
+1. unpivot = gather, pivot = spread
