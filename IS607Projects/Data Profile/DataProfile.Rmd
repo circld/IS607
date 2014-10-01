@@ -1,0 +1,124 @@
+# Data Profiling project
+Paul Garaud
+
+## Data
+Candidate financial summary without PAC breakdown (Election Cycle 2013-14) which is available [here](ftp://ftp.fec.gov/FEC/2014/webl14.zip). Data dictionary for this data set may be found [here](http://www.fec.gov/finance/disclosure/metadata/DataDictionaryWEBL.shtml)<a name="dict"></a>.
+
+Reading the data in after downloading and unzipping it:
+```{r loading.data, results='hide'}
+columns <- c('CAND_ID', 'CAND_NAME', 'CAND_ICI', 'PTY_CD', 
+               'CAND_PTY_AFFILIATION', 'TTL_RECEIPTS', 'TRANS_FROM_AUTH',
+               'TTL_DISB', 'TRANS_TO_AUTH', 'COH_BOP', 'COH_COP',
+               'CAND_CONTRIB', 'CAND_LOANS', 'OTHER_LOANS', 'CAND_LOAN_REPAY',
+               'OTHER_LOAN_REPAY', 'DEBTS_OWED_BY', 'TTL_IND_CONTRIB',
+               'CAND_OFFICE_ST', 'CAND_OFFICE_DISTRICT', 'SPEC_ELECTION',
+               'PRIM_ELECTION', 'RUN_ELECTION', 'GEN_ELECTION',
+               'GEN_ELECTION_PERCENT', 'OTHER_POL_CMTE_CONTRIB',
+               'POL_PTY_CONTRIB', 'CVG_END_DT', 'INDIV_REFUNDS',
+               'CMTE_REFUNDS')
+
+# Note to self: pipe-delimited gets really messed up without the quote = NULL!
+df <- read.table('C:/Users/Paul/CUNY MSDA/IS607/IS607Projects/Data Profile/webl14.txt', header = FALSE,
+                 sep = '|', col.names = columns, stringsAsFactors = FALSE,
+                 na.strings = c('', 'NA'), quote = NULL)
+
+# Ensure CVG_END_DT (Coverage End Date) is in POSIX format
+library(lubridate)
+df$CVG_END_DT <- mdy(df$CVG_END_DT)
+```
+
+## Profile
+
+### General characteristics
+This data set consists of 1784 rows of data, with 30 columns in total.
+
+The variables definitions as follows:
+
+* CAND_ID: Candidate identification
+* CAND_NAME: Candidate name
+* CAND_ICI: Incumbent/Challenger
+* PTY_CD: Party code
+* CAND_PTY_AFFILIATION: Affiliation
+* TTL_RECEIPTS: Total receipts
+* TRANS_FROM_AUTH: Transfers from authorized committees
+* TTL_DISB: Total disbursements
+* TRANS_TO_AUTH: Transfers to authorized committees
+* COH_BOP: Beginning cash
+* COH_COP: Ending cash
+* CAND_CONTRIB: Contributions from candidate
+* CAND_LOANS: Loans from candidate
+* OTHER_LOANS: Other loans
+* DEBTS_OWED_BY: Debts owed by candidate
+* TTL_INDIV_CONTRIB: Total individual contributions
+* CAND_OFFICE_ST: Candidate state
+* CAND_OFFICE_DIST: Candidate district
+* SPEC_ELECTION: Special election status
+* PRIM_ELECTION: Primary election status
+* RUN_ELECTION: Runoff election status
+* GEN_ELECTION: General election status
+* GEN_ELECTION_PERCENT: General election percentage of vote
+* OTHER_POL_CMTE_CONTRIB: Contributions from other political committees
+* POL_PTY_CONTRIB: Contributions from party committees
+* CVG_END_DT: Coverage end date
+* INDIV_REFUNDS: Refunds to individuals
+* CMTE_REFUNDS: Refunds to committees
+
+
+### Looking at variable characteristics: Data type, NAs, number of unique values
+First, we must subtract any transfers from the total in order to ensure that the totals are not double-counting. Specifically, we must subtract transfers from authorized committees from total total receipts, and subtract transfesr to authorized committees from total disbursements when both values are present (see data [dictionary link](#dict) above for more information).
+
+```{r total.corrections}
+df$TTL_RECEIPTS <- df$TTL_RECEIPTS - df$TRANS_TO_AUTH
+df$TTL_DISB <- df$TTL_DISB - df$TRANS_FROM_AUTH
+```
+
+Second, we create a customized function inluding general characteristics about each variable.
+```{r summary.func}
+summary.function <- function(vector) {
+  cat(sprintf("Column data type: %-10s", class(vector)))
+  cat(sprintf('\nNumber of NA values: %-5i', sum(is.na(vector))))
+  cat(sprintf('\nNumber of unique values: %-5i', length(unique(vector))), '\n')
+  cat('Summary statistics:\n')
+  print(summary(vector))
+}
+
+for (name in columns) {
+  cat('\n\nVariable', name, '\n')
+  summary.function(df[[name]])
+}
+```
+Using this information, we can highlight any peculiarities about individual variables.
+
+#### CAND_NAME (Candidate name)
+Interestingly, the number of unique names is smaller than the total number of rows. To see which candidates show up more than once, we use the following code:
+
+```{r dupe.names}
+df$CAND_NAME[duplicated(df$CAND_NAME)]
+```
+
+#### CAND_ICI (Candidate incumbent/challenger/open)
+There are 14 NA values, though it is not clear why this data should be missing since all candidates must be an incumbent, challenger, or running unopposed.
+
+#### CAND_PTY_AFFILIATION
+Interestingly, there are 13 parties besides Democrat and Republican (plus an UNK category for unknown).
+
+#### TTL_RECEIPTS (Total receipts)
+
+Total receipt distribution:
+```{r TTL_RECEIPTS.Dist}
+library(ggplot2)
+library(scales)  # needed for axis editing (non-scientific notation)
+ggplot(df, aes(TTL_RECEIPTS)) + stat_density() + scale_x_sqrt(label = comma)
+```
+
+## Basic analysis
+Let's examine a scatterplot matrix to visually inspect some of the pairwise relationships between variables. Of potential interest are the various monetary variables, party affiliation, and general election percent (where applicable).
+```{r}
+col.classes <- sapply(df, class)
+not.char <- col.classes != 'character'
+not.char.ind <- as.numeric(which(not.char))
+
+# 22 columns is more than can meaningfully fit in a single scatterplot matrix
+# Max appears to be 6 x 6
+pairs(df[, not.char.ind[10:15]])
+```
