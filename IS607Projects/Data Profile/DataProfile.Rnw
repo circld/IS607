@@ -1,15 +1,27 @@
----
-output:
-  pdf_document: default
----
-# Data Profiling project
-##Paul Garaud
+\documentclass[11pt]{article}
+\usepackage{graphicx, verbatim, hyperref}
+\setlength{\textwidth}{6.5in} 
+\setlength{\textheight}{9in}
+\setlength{\oddsidemargin}{0in} 
+\setlength{\evensidemargin}{0in}
+\setlength{\topmargin}{-1.5cm}
+\DeclareGraphicsExtensions{.png,.jpg}
 
-## Data
-Candidate financial summary without PAC breakdown (Election Cycle 2013-14) which is available [here](ftp://ftp.fec.gov/FEC/2014/webl14.zip). Data dictionary for this data set may be found [here](http://www.fec.gov/finance/disclosure/metadata/DataDictionaryWEBL.shtml)<a name="dict"></a>.
+
+\title{Data Profiling project}
+\author{Paul Garaud}
+
+\begin{document}
+\maketitle
+\tableofcontents
+
+\section{Data}
+\label{sec:Data}
+Candidate financial summary without PAC breakdown (Election Cycle 2013-14) which is available \href{ftp
+://ftp.fec.gov/FEC/2014/webl14.zip}{here}. Data dictionary for this data set may be found \href{http://www.fec.gov/finance/disclosure/metadata/DataDictionaryWEBL.shtml}{here}.
 
 Reading the data in after downloading and unzipping it:
-```{r loading-data, results='hide'}
+<<read-data,results='hide'>>=
 columns <- c('CAND_ID', 'CAND_NAME', 'CAND_ICI', 'PTY_CD', 
                'CAND_PTY_AFFILIATION', 'TTL_RECEIPTS', 'TRANS_FROM_AUTH',
                'TTL_DISB', 'TRANS_TO_AUTH', 'COH_BOP', 'COH_COP',
@@ -22,62 +34,37 @@ columns <- c('CAND_ID', 'CAND_NAME', 'CAND_ICI', 'PTY_CD',
                'CMTE_REFUNDS')
 
 # Note to self: pipe-delimited gets really messed up without the quote = NULL!
-df <- read.table('C:/Users/Paul/CUNY MSDA/IS607/IS607Projects/Data Profile/webl14.txt', header = FALSE,
+loc <- 'C:/Users/Paul/CUNY MSDA/IS607/IS607Projects/Data Profile/webl14.txt'
+df <- read.table(loc, header = FALSE,
                  sep = '|', col.names = columns, stringsAsFactors = FALSE,
                  na.strings = c('', 'NA'), quote = NULL)
 
 # Ensure CVG_END_DT (Coverage End Date) is in POSIX format
 library(lubridate)
 df$CVG_END_DT <- mdy(df$CVG_END_DT)
-```
+@
 
-## Profile
-
-### General characteristics
+\section{Profile}
+\label{sec:Profile}
+\subsection{General characteristics}
 This data set consists of 1784 rows of data, with 30 columns in total.
 
 The variables definitions as follows:
 
-* CAND_ID: Candidate identification
-* CAND_NAME: Candidate name
-* CAND_ICI: Incumbent/Challenger
-* PTY_CD: Party code
-* CAND_PTY_AFFILIATION: Affiliation
-* TTL_RECEIPTS: Total receipts
-* TRANS_FROM_AUTH: Transfers from authorized committees
-* TTL_DISB: Total disbursements
-* TRANS_TO_AUTH: Transfers to authorized committees
-* COH_BOP: Beginning cash
-* COH_COP: Ending cash
-* CAND_CONTRIB: Contributions from candidate
-* CAND_LOANS: Loans from candidate
-* OTHER_LOANS: Other loans
-* DEBTS_OWED_BY: Debts owed by candidate
-* TTL_INDIV_CONTRIB: Total individual contributions
-* CAND_OFFICE_ST: Candidate state
-* CAND_OFFICE_DIST: Candidate district
-* SPEC_ELECTION: Special election status
-* PRIM_ELECTION: Primary election status
-* RUN_ELECTION: Runoff election status
-* GEN_ELECTION: General election status
-* GEN_ELECTION_PERCENT: General election percentage of vote
-* OTHER_POL_CMTE_CONTRIB: Contributions from other political committees
-* POL_PTY_CONTRIB: Contributions from party committees
-* CVG_END_DT: Coverage end date
-* INDIV_REFUNDS: Refunds to individuals
-* CMTE_REFUNDS: Refunds to committees
+\begin{itemize}
+\item test
+\end{itemize}
 
+\subsection{Looking at variable characteristics: Data type, NAs, number of unique values}
+First, we must subtract any transfers from the total in order to ensure that the totals are not double-counting. Specifically, we must subtract transfers from authorized committees from total total receipts, and subtract transfesr to authorized committees from total disbursements when both values are present (see data section \ref{sec:Data} above for more information).
 
-### Looking at variable characteristics: Data type, NAs, number of unique values
-First, we must subtract any transfers from the total in order to ensure that the totals are not double-counting. Specifically, we must subtract transfers from authorized committees from total total receipts, and subtract transfesr to authorized committees from total disbursements when both values are present (see data [dictionary link](#dict) above for more information).
-
-```{r total-corrections}
+<<total.receipts>>=
 df$TTL_RECEIPTS <- df$TTL_RECEIPTS - df$TRANS_TO_AUTH
 df$TTL_DISB <- df$TTL_DISB - df$TRANS_FROM_AUTH
-```
+@
 
 Second, we create a customized function inluding general characteristics about each variable.
-```{r summary-func}
+<<summary.func>>=
 summary.function <- function(vector) {
   cat(sprintf("Column data type: %-10s", class(vector)))
   cat(sprintf('\nNumber of NA values: %-5i', sum(is.na(vector))))
@@ -90,59 +77,71 @@ for (name in columns) {
   cat('\n\nVariable', name, '\n')
   summary.function(df[[name]])
 }
-```
+@
 Using this information, we can highlight any peculiarities about individual variables.
 
-#### CAND_NAME (Candidate name)
-Interestingly, the number of unique names is smaller than the total number of rows. To see which candidates show up more than once, we use the following code:
+CAND_NAME (Candidate name)
 
-```{r dupe-names}
+Interestingly, the number of unique names is smaller than the total number of rows. To see which candidates
+show up more than once, we use the following code:
+
+<<<dupe.names>>>=
 df$CAND_NAME[duplicated(df$CAND_NAME)]
-```
+@
 
-#### CAND_ICI (Candidate incumbent/challenger/open)
+CAND_ICI (Candidate incumbent/challenger/open)
+
 There are 14 NA values, though it is not clear why this data should be missing since all candidates must be an incumbent, challenger, or running unopposed.
 
-#### CAND_PTY_AFFILIATION
+CAND_PTY_AFFILIATION (Party affiliation)
+
 Interestingly, there are 13 parties besides Democrat and Republican (plus an UNK category for unknown).
 
-#### TTL_RECEIPTS (Total receipts)
+TTL_RECEIPTS (Total receipts)
+
 The minimum value for total Receipts is an alarming -1.78m. Without documentation for why total receipts can be negative, 
 
-```{r}
-suppressPackageStartupMessages(library(dplyr, quietly=TRUE))
-library(dplyr)
+<<>>=
 # All records with negative total receipts
-df %>% filter(TTL_RECEIPTS < 0) %>% select(TTL_RECEIPTS:TTL_IND_CONTRIB, OTHER_POL_CMTE_CONTRIB, POL_PTY_CONTRIB)
-```
+df %>% filter(TTL_RECEIPTS < 0) %>% 
+  select(TTL_RECEIPTS:TTL_IND_CONTRIB, OTHER_POL_CMTE_CONTRIB, POL_PTY_CONTRIB)
+@
 
-#### INDIV_REFUNDS & CMTE_REFUNDS (Individual/Committee refunds)
+INDIV_REFUNDS & CMTE_REFUNDS (Individual/Committee refunds)
+
 There are some impossible values in both of these variables: both variables have minimum values well below zero. It is unclear what these values represent or whether a negative refund implies that these numbers should be added to the total of total receipts.
 
 Total receipt distribution:
-```{r TTL_RECEIPTS-Dist}
+
+<<Total.Rec.Dist>>=
 library(ggplot2)
 library(scales)  # needed for axis editing (non-scientific notation)
 ggplot(df, aes(TTL_RECEIPTS)) + stat_density() + scale_x_sqrt(label = comma)
-```
+@
 
-## Basic analysis
+\section{Basic analysis}
 Let's examine a scatterplot matrix to visually inspect some of the pairwise relationships between variables. Of potential interest are the various monetary variables, party affiliation, and general election percent (where applicable).
 
-```{r}
+<<>>=
+require(dplyr)
 df.pairs <- df %>% 
   select(PTY_CD, TTL_RECEIPTS, TTL_DISB, DEBTS_OWED_BY, TTL_IND_CONTRIB,
          OTHER_POL_CMTE_CONTRIB, POL_PTY_CONTRIB)
 pairs(df.pairs)
-```
+@
 
 As you would expect, total receipts, total distributions, and individual contribution appear closely linearly related. There also appears to be a noiser and less pronounced linear relationship between total receipts and other political committee contribution--but surprisingly, political party contribution has what appears to be a more neutral or perhaps even downward quadratic relationship. However, there is no reason to suspect any collinearity or othher anomalies in the data. The only data which looks possibly suspect lies in the political party contribution variable--there appear to be a non-trivial number of observations that are bunched at exactly the roughly $45,000 mark:
 
-```{r}
-ggplot(df.pairs, aes(POL_PTY_CONTRIB)) + geom_histogram() + scale_y_sqrt()
+<<>>=
+require(ggvis)
+# df.pairs %>% ggvis(~POL_PTY_CONTRIB) %>% scale_numeric('y', trans = 'sqrt')
 
 # To get the exact number, we use the following:
 nrow(df %>% filter(POL_PTY_CONTRIB >= 45000 & POL_PTY_CONTRIB < 47000))
 # Putting this number into perspective:
 nrow(df %>% filter(POL_PTY_CONTRIB > 25000))
-```
+@
+
+\makeindex
+
+\end{document}
