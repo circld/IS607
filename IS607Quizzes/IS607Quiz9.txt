@@ -1,0 +1,61 @@
+IS607 Week 9 Quiz
+Paul Garaud
+
+1. 
+use employment
+
+2. 
+db.employees.insert(
+    {
+        Name : 'Wendy Yasquez', 
+        Title : 'Assistant Professor', 
+        Salary : 86000, 
+        Department : 'Computer Science', 
+        Hire_Year : 1998
+    }
+)
+
+3. 
+function insert_employee(Name, Title, Salary, Department, Hire_Year) {
+    db.employees.insert({Name : Name, Title : Title, Salary : Salary, Department : Department, Hire_Year : Hire_Year});
+}
+
+4.
+insert_employee('Raoul Dewan', 'Assistant Professor', 78000, ['Physics', 'Biology'], 2009)
+insert_employee('Isabelle Winters', 'Associate Professor', 92000, 'Physics', 1995)
+insert_employee('Jack McDunn', 'Associate Professor', 101000, 'Physics', 1993)
+
+5.
+function insert_admin(Name, Title, Salary, Division, Hire_Year, Location) {
+    db.employees.insert(
+        {
+            Name : Name,
+            Title : Title,
+            Salary : Salary,
+            Division : Division,
+            Hire_Year: Hire_Year
+        }
+    );
+    // handle Location parameter, if provided
+    if (typeof Location !== 'undefined') {
+        db.employees.update(
+            {Name: Name, Hire_Year: Hire_Year},
+            {$set: {Location : Location}}
+        );
+    }
+}
+
+6.
+insert_admin('Tonja Baldner', 'Assistant to the Dean', 42000, 'Arts and Sciences', 2001)
+insert_admin('Dennis Bohnet', 'Vice President', 106500, 'Academic Affairs', 1997, 'Main Campus')
+
+7.
+db.employees.find({ Salary : { $lt : 90000}})
+
+8.
+db.employees.find({ Salary : { $lt : 90000}, Title: /Professor/})
+
+9.
+db.employees.find({ Department: 'Physics', Hire_Year: {$lt 2001}})
+
+10.
