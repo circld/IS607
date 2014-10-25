@@ -29,17 +29,17 @@ insert_employee('Jack McDunn', 'Associate Professor', 101000, 'Physics', 1993)
 function insert_admin(Name, Title, Salary, Division, Hire_Year, Location) {
     db.employees.insert(
         {
-            Name : Name,
-            Title : Title,
-            Salary : Salary,
-            Division : Division,
+            Name : Name ,
+            Title : Title ,
+            Salary : Salary ,
+            Division : Division ,
             Hire_Year: Hire_Year
         }
     );
     // handle Location parameter, if provided
     if (typeof Location !== 'undefined') {
         db.employees.update(
-            {Name: Name, Hire_Year: Hire_Year},
+            {Name: Name, Hire_Year: Hire_Year} ,
             {$set: {Location : Location}}
         );
     }
@@ -56,6 +56,23 @@ db.employees.find({ Salary : { $lt : 90000}})
 db.employees.find({ Salary : { $lt : 90000}, Title: /Professor/})
 
 9.
-db.employees.find({ Department: 'Physics', Hire_Year: {$lt 2001}})
+db.employees.find({ Department : 'Physics', Hire_Year : {$lt 2001}})
 
 10.
+db.employees.find({ Title : /Professor/, Department : /[^Physics]/})
+
+11.
+db.employees.find({ $or : [ { Hire_Year : { $lt : 1997 }}, {Salary : { $gt : 100000 }}]})
+
+12.
+db.employees.update(
+    { Name : 'Tonja Baldner' } ,
+    { $inc : 
+        { Salary: 4200 }
+    }
+)
+
+13.
+db.employees.remove({ Name : 'Raoul Dewan' })
+
+14.
