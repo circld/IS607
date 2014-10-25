@@ -1,0 +1,10 @@
+// IS607 Week 9 Assignment
+// Paul Garaud
+
+// Part I
+mongoimport --headerline --type tsv --db unitedstates --collection docs < "./CUNY MSDA/IS607/IS607HW/districtdata.txt"
+mongoimport --headerline --type tsv --db unitedstates --collection docs < "./CUNY MSDA/IS607/IS607HW/inhabitedterritorydata.txt"
+mongoimport --headerline --type csv --db unitedstates --collection docs < "./CUNY MSDA/IS607/IS607HW/statedata.csv"
+
+// Part II
+// see R script
