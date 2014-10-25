@@ -76,3 +76,5 @@ db.employees.update(
 db.employees.remove({ Name : 'Raoul Dewan' })
 
 14.
+db.pastemployees.save( db.employees.findOne( { Name : 'Raoul Dewan' }))
+db.employees.update( { Name : 'Raoul Dewan' }, { $set : { departyear : 2014 }})
