@@ -30,14 +30,15 @@ print(sapply(c(district, state, territory), validate))
 # mongo2db
 mongo2df <- function(con, coll, query) {
   raw <- mongo.find.all(con, coll, query)
-  row.names(raw) <- NULL
+  row.names(raw) <- NULL  # remove 'val' row names
   list.df <- as.data.frame(raw, stringsAsFactors = FALSE)
   names(list.df)[1] <- 'ID'
   for (name in names(list.df)) {
+    # rename _id column (R doesn't like lead underscore)
     if (name == 'ID') {
       next
     }
-    # convert cols from lists to respetive data type vectors
+    # convert cols from lists to respective data type vectors
     col <- str_c('list.df$', name)
     coltype <- eval(parse(text = str_c('class(', col, '[[1]])')))
     if (str_detect(name, '[dD]ate')) {
@@ -45,6 +46,7 @@ mongo2df <- function(con, coll, query) {
     } else {
       eval(parse(text = str_c(col, '<- as.', coltype, '(', col, ')'))) 
     }
+    # handle any values in JSON format
     if (eval(parse(text = str_c('class(', col, ')'))) == 'character') {
       eval(parse(text = str_c(col,
                               ' <- str_replace_all(', col, ', \'\"\', "")')))
@@ -57,4 +59,3 @@ mongo2df <- function(con, coll, query) {
 district.df <- mongo2df(mongo, coll, district)
 state.df <- mongo2df(mongo, coll, state)
 territory.df <- mongo2df(mongo, coll, territory)
-
