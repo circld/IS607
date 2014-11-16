@@ -1,0 +1,8 @@
+mongoimport --db comptech --collection bli --type csv --headerline --ignoreBlanks --file 141103_BLI_Data.csv
+
+The above command brings in each row in the 'long' format of the data in the csv. This format, creating a 
+separate document for each country-inequality-indicator combination, has the desirable advantage of making it
+easy to query and aggregate over the data. While this avoids complicated, multi-level nesting, it also fails to
+take advantage of some other natural possible aggregations of the data (eg, collecting all data points for a
+country in a single document). In my estimation, the advantages of the querying ease outweigh any additional
+conceptual consistency of a country-level aggregate.

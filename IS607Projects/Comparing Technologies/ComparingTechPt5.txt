@@ -1,0 +1,19 @@
+Part 5: Compare Methods
+
+1. What is the use case addressed by your data set? The Better Life Index (BLI) is an alternative measure of level of development, meant to better capture quality-of-life indicators than other common measures such as GDP. This data would be used to answer questions about quality of life along various dimensions across OECD countries.
+
+2. What are the advantages and disadvantages of each of the three technologies?
+R
+Advantages: R is the most powerful analytical tool among the three technologies, and as a result, any serious analysis would require the data to make its way into R at some point. For instance, it is the only one of the three that can create visualizations.
+Disadvantages: R is not really a storage technology--especially if portability across platforms is necessary. This point becomes even more important when scale becomes an issue.
+
+PostgreSQL
+Advantages: PostgreSQL is a great way to store data while still making it relatively easy to do simple analytics such as aggregations. This is a capable storage option even up to million of rows.
+Disadvantages: It does not have nearly the analytical capabilities of R, and certainly no built-in visualization capabilities (at least that I know of). Additionally, it required the most work to bring the data in and put it in its final format.
+
+MongoDB
+Advantages: Easy one-line import process. Scales horizontally easily and flexibly.
+Disadvantages: However, by far the most cumbersome of the three to query with. Thus, in my opinion, it is almost purely a storage option from which data can be pulled for analysis in R (or some other analytical software suite).
+
+3. Which technology would you recommend for your use case?
+For a dataset of this size or for a one-off analysis of the data, R would be hands-down the technology of choice. If the transformed data resulting from the analysis needed to be persistent (e.g. to be accessible to a website), then barring billions of data points to store, I would store the data using PostgreSQL to complement the analytical capabilities of R.

@@ -34,6 +34,9 @@ blf.wide <- blf.df %>% filter(Inequality != 'High', Inequality != 'Low') %>%
 blf.wide[blf.wide$Gender == 'Total', 'Gender'] <- 'Both'
 blf.wide$Gender <- factor(blf.wide$Gender)
 
+# Save as .RData
+save(blf.wide, file = 'blfwide.RData')
+
 #### Detailed description of dataset ####
 # blf.wide contains various quality-of-life indicators by country and sex.
 # For each country, there are three rows: indicator data for men, women, &
