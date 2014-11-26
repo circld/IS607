@@ -1,15 +1,17 @@
-# IS607 Week 13 Quiz
-# Paul Garaud
-
-require(microbenchmark)
-
-# function to profile: matrix multiplication (vcov)
-set.seed(100)
+require(doParallel)
 
 test.func <- function() {
+  set.seed(100)
   x = matrix(data = runif(10000), nrow = 100, ncol = 100)
   return(x %*% t(x))
 }
 
-microbenchmark(test.func(), unit = 's')
-# ~ .002 sec mean execution time
+cl <- makeCluster(detectCores())
+registerDoParallel(cl)
+
+# parallelized version
+microbenchmark(foreach(i=1:100) %dopar% test.func(), unit = 's')
+# non-parallelized version
+microbenchmark(foreach(i=1:100) %do% test.func(), unit = 's')
+
+stopCluster(cl)
