@@ -12,7 +12,7 @@ if (!require(RNeo4j)) {
 # Load R data (exchange rate data)
 df <- data.frame(euro.cross)
 
-# Initialize graph object (in *currently loaded db*)
+# Initialize graph object (in *currently loaded & running neo4j db*)
 db.loc <- 'http://localhost:7474/db/data/'
 graph.df <- startGraph(db.loc)
 
