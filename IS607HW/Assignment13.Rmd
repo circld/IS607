@@ -1,0 +1,28 @@
+## IS607 Week 13 Assignment Part 3
+
+This script aims to test the performance of gsub (base R) against str_replace_all (stringr).
+
+## Getting started
+Import the necessary packages:
+```{r, echo=FALSE}
+require(stringr)
+require(microbenchmark)
+```
+
+Generate random character data (this will take some time):
+```{r, echo=TRUE}
+ex.data <- NULL
+
+for (i in 1:100000) {
+  ex.data[i] <- paste(sample(letters, 10, replace = TRUE), collapse = '')
+}
+```
+## Performance
+Now we have everything we need to compare the two functions.
+```{r, echo=TRUE}
+# stringr replace
+microbenchmark(str_replace_all(ex.data, 'a', ''))
+# base replace
+microbenchmark(gsub('a', '', ex.data))
+```
+The difference in performance is not very pronounced, but this is unsurprising as str_replace_all() is a wrapper around gsub().
