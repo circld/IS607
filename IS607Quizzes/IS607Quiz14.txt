@@ -1,0 +1,39 @@
+IS607 Week 14 Quiz
+Paul Garaud
+
+Assumptions:
+Internet connection: 20Mbps/5Mbps (Download/Upload)
+Unzip speed: 3MB per second
+Unzipped file: five times the zipped file size
+Average zipped size: 90MB
+Number of files per month: 700
+DB Processing: 150MB per second (sum size for each month)
+Aggregated data size: 1/n size of n files
+
+Result:
+2.7 years total time to complete all steps
+
+Calculation:
+
+Download:
+single file size * count / (download speed * 60 sec * 60 min * 24 hrs)
+= 90 * (700 * 12 * 8) / (20 * 60 * 60 * 24) = 35 days
+
+Unzip
+single file size * count / (unzip speed * 60 * 60 * 24)
+= 233.33 days
+
+Load
+single unzipped file * count / (upload speed * 60 * 60 * 24)
+= 700 days
+
+Process
+single unzipped file * count / (DB processing speed * 60 * 60 * 24)
+= 23.33 days
+
+Upload
+(single unzipped file / number of original files in unit) * months /
+(Upload * 60 * 60 * 24)
+= 0 days
+
+Total = 992 days ~= 2.7 years
