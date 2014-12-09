@@ -15,8 +15,18 @@ require(stringr)
 
 # Data acquisition
 
-# Getting Auto sales data
-
+# Getting Auto sales data (millions of units)
+ua <- "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:33.0) Gecko/20100101 Firefox/33.0"
+fred.url <- 'http://research.stlouisfed.org/fred2/series/TOTALSA/downloaddata'
+fred.query <- list('form[native_frequency]' = 'Monthly', 
+                   'form[units]' = 'lin',
+                    'form[frequency]' = 'Monthly', 'form[obs_start_date]' = "1976-01-01",
+                    'form[obs_end_date]' = "2014-11-01", 'form[file_format]' = 'txt',
+                    'form[aggregation]' = 'Average',
+                    sep = '&')
+fred.response <- POST(fred.url, body = fred.query, user_agent(ua))
+fred.con <- textConnection(content(fred.response, 'text'))
+fred.data <- read.table(fred.con, header = TRUE, sep = "", skip = 10)
 
 # Getting GDP data
 
