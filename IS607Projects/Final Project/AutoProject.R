@@ -16,6 +16,8 @@ require(stringr)
 require(tidyr)
 require(dplyr)
 require(lubridate)
+require(zoo)
+require(caret)
 
 #### Data acquisition ####
 
@@ -108,16 +110,39 @@ data <- Reduce(function(...) merge(..., all = TRUE),
 
 rm(bls.data, nber.data, fred.data)
 
-# Reshape dataset to include lagged variables
+# create lags for each variable
+data.ts <- read.zoo(data)
+for (lag in 1:3) {
+  data[, c(str_c('L', lag, 'SalesM'),
+           str_c('L', lag, 'RGDP'), 
+           str_c('L', lag, 'Unemployment'))
+       ] <- lag(data.ts, -lag, na.pad = TRUE)
+}
 
+rm(data.ts)
 
+# remove rows with NA
+data <- na.omit(data)
 
+rownames <- data$Month
+data <- data[, -1]  # remove Month column (since in rownames)
 
+#### Analysis ####
 
+# split data into train and test samples
+n <- dim(data)[1]
+in.test <- seq(n - (n %/% 10 * 2), n)  # integer division
+test <- data[in.test, ]
+train <- data[-in.test, ]
 
+linear <- lm(SalesM ~ ., data = train)
+summary(linear)
 
-
-
+# performance
+# TODO: ggplot/ggvis for graphics, prediction accuracy +/-
+linfit <- predict(linear, newdata = test, se.fit = TRUE)
+plot(linfit$fit, test$SalesM)
+abline(coef = c(0, 1))
 
 
 
