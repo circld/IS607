@@ -17,7 +17,10 @@ require(tidyr)
 require(dplyr)
 require(lubridate)
 require(zoo)
+require(ggplot2)
 require(caret)
+require(randomForest)
+require(doParallel)
 
 #### Data acquisition ####
 
@@ -116,7 +119,7 @@ for (lag in 1:3) {
   data[, c(str_c('L', lag, 'SalesM'),
            str_c('L', lag, 'RGDP'), 
            str_c('L', lag, 'Unemployment'))
-       ] <- lag(data.ts, -lag, na.pad = TRUE)
+       ] <- stats::lag(data.ts, -lag, na.pad = TRUE)  # avoid dplyr::lag
 }
 
 rm(data.ts)
@@ -124,8 +127,8 @@ rm(data.ts)
 # remove rows with NA
 data <- na.omit(data)
 
-rownames <- data$Month
-data <- data[, -1]  # remove Month column (since in rownames)
+rownames(data) <- data$Month
+data <- data[, -c(1, 3, 4)]  # remove Month column (since in rownames)
 
 #### Analysis ####
 
@@ -136,13 +139,84 @@ test <- data[in.test, ]
 train <- data[-in.test, ]
 
 linear <- lm(SalesM ~ ., data = train)
-summary(linear)
+
+rm(list = c('n', 'in.test'))
 
 # performance
-# TODO: ggplot/ggvis for graphics, prediction accuracy +/-
+
+MSE <- function(actual, pred) {
+  error <- actual - pred
+  return(sum(error**2) / length(error))
+}
+
+SE_bounds <- function(pred, se) {
+  return(list(upper = pred + 1.96 * se, lower = pred - 2*se))
+}
+
+# linear regression (benchmark)
 linfit <- predict(linear, newdata = test, se.fit = TRUE)
-plot(linfit$fit, test$SalesM)
-abline(coef = c(0, 1))
+lm.pred <- data.frame(date = rownames(data), actual = data$SalesM, 
+                      predicted = c(rep(NA, dim(data)[1] - length(linfit$fit)), 
+                                    linfit$fit),
+                      se_l = c(rep(NA, dim(data)[1] - length(linfit$fit)),
+                               SE_bounds(linfit$fit, linfit$se.fit)$lower),
+                      se_u = c(rep(NA, dim(data)[1] - length(linfit$fit)),
+                               SE_bounds(linfit$fit, linfit$se.fit)$upper))
+print(summary(linear))
+print(paste('MSE:', MSE(test$SalesM, linfit$fit)))
+
+tick.dates <- c('1976-04-01', '1980-01-01', '1985-01-01', '1990-01-01',
+                '1995-01-01', '2000-01-01', '2005-01-01', '2010-01-01')
+ggplot(lm.pred, aes(x = date, y = actual)) + geom_point(alpha = .8) + 
+  geom_point(aes(y = predicted), color = 'red', alpha = .8) +
+  scale_x_discrete(breaks = tick.dates) + 
+  geom_smooth(aes(y = predicted, ymin = se_l, ymax = se_u, group = 1), 
+              , color = 'red', linetype = 0 , stat = 'identity') +
+  labs(title = 'Actual (black) and predicted (red) auto sales', x = 'Month', 
+       y = 'Auto Sales (m)')
+
+# random forests
+# 1. set up parallelization (see open tab)
+# 2. run parallelized RF model using caret
+# Explicitly register clusters to work with caret
+# See: http://stackoverflow.com/questions/24786089/parrf-on-caret-not-working-for-more-than-one-core
+cl <- makePSOCKcluster(4)
+clusterEvalQ(cl, library(foreach))
+registerDoParallel(cl)
+
+randForest <- train(SalesM ~ ., data = train, method = 'rf',
+                    trControl = trainControl(method = 'cv', number = 10),
+                    prox = TRUE, allowParallel = TRUE)
+print(randForest$finalModel)
+rf.fit <- predict(randForest, test)
+print(paste('Random Forest Fitted MSE:', MSE(test$SalesM, rf.fit)))
+
+rf.pred <- data.frame(Month = rownames(data), actual = data$SalesM,
+                      predicted = c(rep(NA, dim(data)[1] - length(rf.fit)), 
+                                        rf.fit))
+ggplot(rf.pred, aes(x = Month, y = actual)) + geom_point(alpha = .8) + 
+  geom_point(aes(y = predicted), color = 'red', alpha = .8) +
+  scale_x_discrete(breaks = tick.dates) + 
+  labs(title = 'Actual (black) and predicted (red) auto sales', x = 'Month', 
+       y = 'Auto Sales (m)')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
