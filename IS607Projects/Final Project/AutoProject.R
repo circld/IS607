@@ -162,7 +162,6 @@ lm.pred <- data.frame(date = rownames(data), actual = data$SalesM,
                                SE_bounds(linfit$fit, linfit$se.fit)$lower),
                       se_u = c(rep(NA, dim(data)[1] - length(linfit$fit)),
                                SE_bounds(linfit$fit, linfit$se.fit)$upper))
-print(summary(linear))
 print(paste('Linear Model MSE:', MSE(test$SalesM, linfit$fit)))
 
 tick.dates <- c('1976-04-01', '1980-01-01', '1985-01-01', '1990-01-01',
@@ -185,10 +184,9 @@ registerDoParallel(cl)
 # using naive train/test sets
 randForest <- train(SalesM ~ ., data = train, method = 'rf',
                     trControl = trainControl(method = 'cv', number = 10),
-                    prox = TRUE) #, allowParallel = TRUE)
-print(randForest$finalModel)
+                    prox = TRUE, allowParallel = TRUE, importance = TRUE)
 rf.fit <- predict(randForest, test)
-print(paste('Random Forest Fitted MSE:', MSE(test$SalesM, rf.fit)))
+print(paste('Random Forest MSE:', MSE(test$SalesM, rf.fit)))
 
 rf.pred <- data.frame(Month = rownames(data), actual = data$SalesM,
                       predicted = c(rep(NA, dim(data)[1] - length(rf.fit)), 
@@ -205,7 +203,8 @@ randForest2 <- train(SalesM ~ ., data = train, method = 'rf',
                                           initialWindow = 50,
                                           horizon = 15,
                                           fixedWindow = TRUE),
-                 prox = TRUE)
+                 prox = TRUE, allowParallel = TRUE, importance = TRUE)
+stopCluster(cl)
 rf.fit2 <- predict(randForest2, test)
 print(paste('Random Forest with time slicing MSE:',
             MSE(test$SalesM, rf.fit2)))
@@ -218,6 +217,13 @@ ggplot(rf.pred2, aes(x = Month, y = actual)) + geom_point(alpha = .8) +
   scale_x_discrete(breaks = tick.dates) + 
   labs(title = 'Actual (black) and predicted (red) auto sales', x = 'Month', 
        y = 'Auto Sales (m)')
+
+# Which of these variables appear to drive auto sales?
+rf.imp <- importance(randForest$finalModel)
+rf2.imp <- importance(randForest2$finalModel)
+print(summary(linear))
+print(rf.imp[order(rf.imp[,1], decreasing = TRUE),])
+print(rf2.imp[order(rf2.imp[,1], decreasing = TRUE),])
 
 
 # what is the predicted volume of auto sales this month according to these 
@@ -233,10 +239,11 @@ new.data <- list(L1SalesM = 17.5,
                  L3SalesM = 16.8,
                  L3RGDP = 14000,
                  L3Unemployment = 5.8)
-
-predict(linear, new.data)
-predict(randForest, new.data)
-predict(randForest2, new.data)
+writeLines('\n')
+print(paste('Linear model prediction:', predict(linear, new.data)))
+print(paste('Random forest naive prediction:', predict(randForest, new.data)))
+print(paste('Random forest time slice prediction:',
+            predict(randForest2, new.data)))
 
 # ~17m cars sold in December
-# my guess--overshoots, not sure this model will reflect seasonal trends
+# my guess--overshoots, not sure these model will reflect seasonal trends
