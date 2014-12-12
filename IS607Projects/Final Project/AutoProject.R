@@ -163,7 +163,7 @@ lm.pred <- data.frame(date = rownames(data), actual = data$SalesM,
                       se_u = c(rep(NA, dim(data)[1] - length(linfit$fit)),
                                SE_bounds(linfit$fit, linfit$se.fit)$upper))
 print(summary(linear))
-print(paste('MSE:', MSE(test$SalesM, linfit$fit)))
+print(paste('Linear Model MSE:', MSE(test$SalesM, linfit$fit)))
 
 tick.dates <- c('1976-04-01', '1980-01-01', '1985-01-01', '1990-01-01',
                 '1995-01-01', '2000-01-01', '2005-01-01', '2010-01-01')
@@ -176,17 +176,16 @@ ggplot(lm.pred, aes(x = date, y = actual)) + geom_point(alpha = .8) +
        y = 'Auto Sales (m)')
 
 # random forests
-# 1. set up parallelization (see open tab)
-# 2. run parallelized RF model using caret
 # Explicitly register clusters to work with caret
 # See: http://stackoverflow.com/questions/24786089/parrf-on-caret-not-working-for-more-than-one-core
 cl <- makePSOCKcluster(4)
 clusterEvalQ(cl, library(foreach))
 registerDoParallel(cl)
 
+# using naive train/test sets
 randForest <- train(SalesM ~ ., data = train, method = 'rf',
                     trControl = trainControl(method = 'cv', number = 10),
-                    prox = TRUE, allowParallel = TRUE)
+                    prox = TRUE) #, allowParallel = TRUE)
 print(randForest$finalModel)
 rf.fit <- predict(randForest, test)
 print(paste('Random Forest Fitted MSE:', MSE(test$SalesM, rf.fit)))
@@ -200,24 +199,44 @@ ggplot(rf.pred, aes(x = Month, y = actual)) + geom_point(alpha = .8) +
   labs(title = 'Actual (black) and predicted (red) auto sales', x = 'Month', 
        y = 'Auto Sales (m)')
 
+# using rolling splitting for cross validation
+randForest2 <- train(SalesM ~ ., data = train, method = 'rf',
+                 trControl = trainControl(method = 'timeslice',
+                                          initialWindow = 50,
+                                          horizon = 15,
+                                          fixedWindow = TRUE),
+                 prox = TRUE)
+rf.fit2 <- predict(randForest2, test)
+print(paste('Random Forest with time slicing MSE:',
+            MSE(test$SalesM, rf.fit2)))
+
+rf.pred2 <- data.frame(Month = rownames(data), actual = data$SalesM,
+                      predicted = c(rep(NA, dim(data)[1] - length(rf.fit2)), 
+                                        rf.fit2))
+ggplot(rf.pred2, aes(x = Month, y = actual)) + geom_point(alpha = .8) + 
+  geom_point(aes(y = predicted), color = 'red', alpha = .8) +
+  scale_x_discrete(breaks = tick.dates) + 
+  labs(title = 'Actual (black) and predicted (red) auto sales', x = 'Month', 
+       y = 'Auto Sales (m)')
 
 
+# what is the predicted volume of auto sales this month according to these 
+# models?
+# Note: Stock-Watson RGDP figures not available post-2010, used assumed
+# numbers below (random forest models not particularly sensitive to GDP)
+new.data <- list(L1SalesM = 17.5,
+                 L1RGDP = 14000,
+                 L1Unemployment = 5.9,
+                 L2SalesM = 16.8,
+                 L2RGDP = 14000,
+                 L2Unemployment = 5.8,
+                 L3SalesM = 16.8,
+                 L3RGDP = 14000,
+                 L3Unemployment = 5.8)
 
+predict(linear, new.data)
+predict(randForest, new.data)
+predict(randForest2, new.data)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+# ~17m cars sold in December
+# my guess--overshoots, not sure this model will reflect seasonal trends
