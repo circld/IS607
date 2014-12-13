@@ -159,17 +159,18 @@ lm.pred <- data.frame(date = rownames(data), actual = data$SalesM,
                                SE_bounds(linfit$fit, linfit$se.fit)$lower),
                       se_u = c(rep(NA, dim(data)[1] - length(linfit$fit)),
                                SE_bounds(linfit$fit, linfit$se.fit)$upper))
-print(paste('Linear Model MSE:', MSE(test$SalesM, linfit$fit)))
+print(paste('Linear Model MSE:', round(MSE(test$SalesM, linfit$fit), 2)))
 
 tick.dates <- c('1976-04-01', '1980-01-01', '1985-01-01', '1990-01-01',
                 '1995-01-01', '2000-01-01', '2005-01-01', '2010-01-01')
-ggplot(lm.pred, aes(x = date, y = actual)) + geom_point(alpha = .8) + 
-  geom_point(aes(y = predicted), color = 'red', alpha = .8) +
+ggplot(lm.pred, aes(x = date, y = actual)) + geom_point(alpha = .7) + 
+  geom_point(aes(y = predicted), color = 'red', alpha = .7) +
   scale_x_discrete(breaks = tick.dates) + 
   geom_smooth(aes(y = predicted, ymin = se_l, ymax = se_u, group = 1), 
               , color = 'red', linetype = 0 , stat = 'identity') +
-  labs(title = 'Linear Model Actual (black) and predicted (red) auto sales', x = 'Month', 
+  labs(title = 'Linear model actual (black) and predicted (red) sales', x = 'Month', 
        y = 'Auto Sales (m)')
+
 
 # random forests
 # Explicitly register clusters to work with caret
@@ -183,7 +184,7 @@ randForest <- train(SalesM ~ ., data = train, method = 'rf',
                     trControl = trainControl(method = 'cv', number = 10),
                     prox = TRUE, allowParallel = TRUE, importance = TRUE)
 rf.fit <- predict(randForest, test)
-print(paste('Random Forest MSE:', MSE(test$SalesM, rf.fit)))
+print(paste('Random Forest MSE:', round(MSE(test$SalesM, rf.fit), 2)))
 
 rf.pred <- data.frame(Month = rownames(data), actual = data$SalesM,
                       predicted = c(rep(NA, dim(data)[1] - length(rf.fit)), 
@@ -204,7 +205,7 @@ randForest2 <- train(SalesM ~ ., data = train, method = 'rf',
 stopCluster(cl)
 rf.fit2 <- predict(randForest2, test)
 print(paste('Random Forest with time slicing MSE:',
-            MSE(test$SalesM, rf.fit2)))
+            round(MSE(test$SalesM, rf.fit2), 2)))
 
 rf.pred2 <- data.frame(Month = rownames(data), actual = data$SalesM,
                       predicted = c(rep(NA, dim(data)[1] - length(rf.fit2)), 
@@ -216,9 +217,13 @@ ggplot(rf.pred2, aes(x = Month, y = actual)) + geom_point(alpha = .8) +
        x = 'Month', y = 'Auto Sales (m)')
 
 # Which of these variables appear to drive auto sales?
+zscore <- function(num.vect) {
+  return((num.vect - mean(num.vect)) / sd(num.vect))
+}
+linear.scaled <- lm(SalesM ~ ., data = as.data.frame(apply(train, 2, zscore)))
 rf.imp <- importance(randForest$finalModel)
 rf2.imp <- importance(randForest2$finalModel)
-print(summary(linear))
+print(summary(linear.scaled))
 print(rf.imp[order(rf.imp[,1], decreasing = TRUE),])
 print(rf2.imp[order(rf2.imp[,1], decreasing = TRUE),])
 

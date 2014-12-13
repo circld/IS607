@@ -306,29 +306,35 @@ ggplot(rf.pred2, aes(x = Month, y = actual)) + geom_point(alpha = .7) +
 Both the MSE and the chart demonstrate unequivocally the improvement in the model performance out of sample. However, the linear model still outperforms the much more computationally intensive random forest model.
 
 ### Driver of auto sales
+<a name='driver'></a>
 So which of these variables seems to be most influential for predicting auto sales? To answer this question, we will look at variable statistics for each of the models above.
 
-In the case of the linear model, we can use the size of the coefficient as an indicator of how important a variable is for predicting sales, provided that we are confident in the accuracy of the estimate (ie, taking into account the standard errors).
+In the case of the linear model, we will need to center and scale the variables and fit the model again to ensure that the variables are of comparable units (or rather, unit-less). This way, we can use the size of the coefficient as an indicator of how important a variable is for predicting sales, provided that we are confident in the accuracy of the estimate (ie, taking into account the standard errors).
 
 For random forest models, we will use the mean increase in MSE as the primary measure of variable importance. A detailed description of the statistic is available on [Wikipedia](http://en.wikipedia.org/wiki/Random_forest#Variable_importance) or in the [caret documentation](http://cran.r-project.org/web/packages/randomForest/randomForest.pdf). 
 
-Note that the output below includes another measure of variable importance, node purity. Change in node purity and the above measure do not necessarily correspond. Since we are examining different lags of the same (persistent) variables, the former measure assesses a variable's importance while taking into account the impact of other lags, whereas the latter does not. Hence, we'll the former.
+Note that the output below includes another measure of variable importance, node purity. Change in node purity and the above measure do not necessarily correspond. Since we are examining different lags of the same (persistent) variables, the former measure assesses a variable's importance while taking into account the impact of other lags, whereas the latter does not. Hence, we'll use the former.
 ```{r vars}
+zscore <- function(num.vect) {
+  return((num.vect - mean(num.vect)) / sd(num.vect))
+}
+
+linear.scaled <- lm(SalesM ~ ., data = as.data.frame(apply(train, 2, zscore)))
 rf.imp <- importance(randForest$finalModel)
 rf2.imp <- importance(randForest2$finalModel)
-print(summary(linear))
+print(summary(linear.scaled))
 print(rf.imp[order(rf.imp[,1], decreasing = TRUE),])
 print(rf2.imp[order(rf2.imp[,1], decreasing = TRUE),])
 ```
 
-The linear model suggests that the previous month's sales is a strong predictor on this month's sales, as we might expect of a highly persisent time series. The previous month's unemployment is also an important predictor of this month's sales, though the estimated coefficient is less precise.
+The linear model suggests that the previous month's sales is a strong predictor on this month's sales, as we might expect of a highly persisent time series. The previous month's unemployment is also an important predictor of this month's sales, though the estimated coefficient is less precise. Finally, the two-month lag of RGDP appears to have the most sizeable impact on sales.
 
 Both random forest models support the evidence in the linear model regarding the importance of the first lag of sales. Interestingly, they also rank the impact of real GDP more highly than unemployment.
 
-In the end, the only thing we can say with any confidence is that the first lag of sales is an important predictor for the next month's sales. Whether unemployment or real GDP is a better predictor of future sales is less clear.
+In sum, the first lag of sales is an important predictor for the next month's sales. Lagged RGDPmay also have predictive power, although in the linear model, only the second lag was significant at the 5% level. Whether real GDP really is a better predictor of future sales than unemployment is not completely clear, though there is some suggestive evidence that in support of this position.
 
 ## Auto sales this month
-What is the predicted volume of auto sales this month (December 2014) according to these models? Unfortunately, Stock-Watson RGDP figures are not available after 2010, so the data below uses completely fabricated RGDP numbers below. (Some ad hoc testing showed that the random forest models are not particularly sensitive to the magnitude of any of the RGDP variables.)
+Since we have these three models trained and ready to go, let's have a bit of fun and predict the volume of auto sales this month (December 2014). Unfortunately, Stock-Watson RGDP figures are not available after 2010, so the data below uses completely fabricated RGDP numbers below. (Some ad hoc testing showed that the random forest models are not particularly sensitive to the magnitude of any of the RGDP variables.)
 ```{r dec.sales}
 new.data <- list(L1SalesM = 17.5,
                  L1RGDP = 14000,
@@ -343,4 +349,4 @@ predict(linear, new.data)
 predict(randForest, new.data)
 predict(randForest2, new.data)
 ```
-It looks like the three models more or less agree that roughly 17m cars will be sold in December. My gut tells me that this number might overshoot, especially since weam not sure whether these model will adequately take into account seasonality of sales.
+It looks like the three models more or less agree that roughly 17m cars will be sold in December. My gut tells me that this number might overshoot the actual number a bit, especially since I am not sure whether these models adequately take into account the seasonality of sales.
