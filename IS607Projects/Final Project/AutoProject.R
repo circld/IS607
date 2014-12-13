@@ -97,11 +97,8 @@ nber.data$Month <- ymd(nber.data$Month)  # Month to posix
 names(bls.data) <- c('Year', '01', '02', '03', '04', '05', '06', '07', '08',
                      '09', '10', '11', '12')
 bls.data <- bls.data %>% gather(MonthNum, Unemployment, -Year) %>%
-  unite_('Month', c('Year', 'MonthNum'), sep = '-')
+  unite_('Month', c('Year', 'MonthNum'), sep = '-') %>% arrange(Month)
 bls.data$Month <- str_c(bls.data$Month, '-01')
-by.month <- order(bls.data$Month)
-bls.data <- bls.data[by.month, ]
-rm(by.month)
 
 # limit date range
 bls.data <- bls.data[bls.data$Month <= '2010-06-01', ]
@@ -171,7 +168,7 @@ ggplot(lm.pred, aes(x = date, y = actual)) + geom_point(alpha = .8) +
   scale_x_discrete(breaks = tick.dates) + 
   geom_smooth(aes(y = predicted, ymin = se_l, ymax = se_u, group = 1), 
               , color = 'red', linetype = 0 , stat = 'identity') +
-  labs(title = 'Actual (black) and predicted (red) auto sales', x = 'Month', 
+  labs(title = 'Linear Model Actual (black) and predicted (red) auto sales', x = 'Month', 
        y = 'Auto Sales (m)')
 
 # random forests
@@ -181,7 +178,7 @@ cl <- makePSOCKcluster(4)
 clusterEvalQ(cl, library(foreach))
 registerDoParallel(cl)
 
-# using naive train/test sets
+# using 10-fold CV train/test sets
 randForest <- train(SalesM ~ ., data = train, method = 'rf',
                     trControl = trainControl(method = 'cv', number = 10),
                     prox = TRUE, allowParallel = TRUE, importance = TRUE)
@@ -194,8 +191,8 @@ rf.pred <- data.frame(Month = rownames(data), actual = data$SalesM,
 ggplot(rf.pred, aes(x = Month, y = actual)) + geom_point(alpha = .8) + 
   geom_point(aes(y = predicted), color = 'red', alpha = .8) +
   scale_x_discrete(breaks = tick.dates) + 
-  labs(title = 'Actual (black) and predicted (red) auto sales', x = 'Month', 
-       y = 'Auto Sales (m)')
+  labs(title = 'Cross-validated Random Forest Actual (black) and predicted (red) auto sales', 
+       x = 'Month', y = 'Auto Sales (m)')
 
 # using rolling splitting for cross validation
 randForest2 <- train(SalesM ~ ., data = train, method = 'rf',
@@ -215,8 +212,8 @@ rf.pred2 <- data.frame(Month = rownames(data), actual = data$SalesM,
 ggplot(rf.pred2, aes(x = Month, y = actual)) + geom_point(alpha = .8) + 
   geom_point(aes(y = predicted), color = 'red', alpha = .8) +
   scale_x_discrete(breaks = tick.dates) + 
-  labs(title = 'Actual (black) and predicted (red) auto sales', x = 'Month', 
-       y = 'Auto Sales (m)')
+  labs(title = 'Time-sliced Random Forest Actual (black) and predicted (red) auto sales',
+       x = 'Month', y = 'Auto Sales (m)')
 
 # Which of these variables appear to drive auto sales?
 rf.imp <- importance(randForest$finalModel)
@@ -225,9 +222,8 @@ print(summary(linear))
 print(rf.imp[order(rf.imp[,1], decreasing = TRUE),])
 print(rf2.imp[order(rf2.imp[,1], decreasing = TRUE),])
 
-
-# what is the predicted volume of auto sales this month according to these 
-# models?
+# what is the predicted volume of auto sales this month (December 2014)
+# according to these models?
 # Note: Stock-Watson RGDP figures not available post-2010, used assumed
 # numbers below (random forest models not particularly sensitive to GDP)
 new.data <- list(L1SalesM = 17.5,

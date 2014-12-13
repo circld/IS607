@@ -1,0 +1,346 @@
+# What drives auto sales?
+Paul Garaud
+
+## Motivation
+Over the past few months, I have noticed a remarkable number of cars driving around Denver without license plates. The number of new cars on the road raised a number of questions:
+
+* Is this a national trend? 
+* What exactly is driving this surge in new auto sales?
+* Which economic factors (if any) are driving these sales?
+
+This project will look at the last question using publicly available national data and build forecasting models to examine this dynamic.
+
+## Data
+
+### Data sources
+[Automobile sales data](http://research.stlouisfed.org/fred2/series/TOTALSA/downloaddata)
+
+[Real GDP](http://www.nber.org/cycles/BCDCFiguresData100920_ver5.xlsx)
+
+[Unemployment rate](http://data.bls.gov/timeseries/LNS14000000)
+
+### Variables
+<a name='Data'></a>
+Due to limitations in data availability and time, we will include only three variables in the analyses below. These are:
+
+* Sales of automobiles (in millions)
+* Real GDP (Stock-Watson Index)
+* Unemployment rate
+
+As with many time series, car sales may be expected to be persisent; in other words, last month's car sales volume will be 'similar' to this month's sales figure. Hence, prior month sales will be used to train the forecasting models below. Real GDP is included to capture economic growth. Finally, the unemployment rate measures another aspect of people's economic well-being and will also be included as a predictor. 
+
+While these last two factors may overlap to some extent, they are in fact distinct from each other and, as the jobless recovery following the Great Recession demonstrates, they do not necessarily track one another.
+
+Since we will also be forecasting auto sales, we will include lags of each of the above variable as predictors in our models. Specifically, the 1-, 2-, and 3-month prior values of each variable are used.
+
+## Data acquisition
+Loading all required packages.
+```{r load.packages, message=FALSE}
+require(httr)
+require(XML)
+require(xlsx)
+require(stringr)
+require(tidyr)
+require(dplyr)
+require(lubridate)
+require(zoo)
+require(ggplot2)
+require(caret)
+require(randomForest)
+require(doParallel)
+```
+
+### Auto sales data
+Let's get the auto sales data first. Since the parameters of the data are set by an HTML form, we'll need to check the HTML of the page source to find the names of the form parameters and the possible values. The parameters and the values which we want can then be stored in a list to be passed as part of the POST request.
+```{r fred1}
+fred.url <- 'http://research.stlouisfed.org/fred2/series/TOTALSA/downloaddata'
+fred.query <- list('form[native_frequency]' = 'Monthly', 
+                   'form[units]' = 'lin',
+                    'form[frequency]' = 'Monthly', 'form[obs_start_date]' = "1976-01-01",
+                    'form[obs_end_date]' = "2014-11-01", 'form[file_format]' = 'txt',
+                    'form[aggregation]' = 'Average',
+                    sep = '&')
+```
+To avoid having to save a hardcopy file, the content of the HTTP request is passed as to read.table as a text connection, allowing `read.table` to create a data frame directly from text. As a final step, we clean up any variables that are not relevant for the subsequent processing.
+```{r fred2}
+fred.response <- POST(fred.url, body = fred.query)
+fred.con <- textConnection(content(fred.response, 'text'))
+fred.data <- read.table(fred.con, header = TRUE, sep = "", skip = 10, 
+                        stringsAsFactors = FALSE)
+
+rm(list = c('fred.query', 'fred.response', 'fred.con'))
+```
+
+### Real GDP data
+Real GDP (RGDP) data is hosted as an Excel file, which complicates things a bit. To get the data in, we download the file to disk (the user will be prompted to choose where to save the data) and use the `xlsx` R package to read it in.
+```{r nber}
+nber.url <- 'http://www.nber.org/cycles/BCDCFiguresData100920_ver5.xlsx'
+nber.dir <- choose.dir(caption = 'Select directory in which to save NBER data.')
+nber.loc <- str_c(nber.dir, '\\NBER_data.xlsx')
+download.file(nber.url, nber.loc, mode = 'wb')
+nber.data <- read.xlsx(nber.loc, sheetIndex = 2, startRow = 2)
+
+rm(list = c('nber.dir', 'nber.loc'))
+```
+
+### Unemployment rate data
+Acquiring the unemployment data from the Bureau of Labor Statistics website will be similar to the steps we took to get the sales data.
+```{r bls1}
+bls.url <- 'http://data.bls.gov/timeseries/LNS14000000/pdq/SurveyOutputServlet'
+bls.query <- list(request_action = 'get_data',
+                  reformat = 'true',
+                  from_results_page = 'false',
+                  years_option = 'specific_years',
+                  delimiter = 'comma',
+                  output_type = 'default',
+                  output_view = 'data',
+                  to_year = 2014,
+                  from_year = 1976,
+                  output_format = 'text',
+                  original_output_type = 'default',
+                  annualAveragesRequested = 'false',
+                  include_graphs = 'false'
+                  )
+bls.response <- GET(bls.url, query = bls.query, encode = 'form')
+```
+This time, however, the data is served within the response HTML and will need to be extracted using the `XML` package. Once again, the extracted data will be passed as a text connection, this time to `read.csv`, to create the data frame.
+```{r bls2}
+bls.html <- htmlTreeParse(readBin(bls.response$content,
+                                  'text'), 
+                          useInternalNodes = TRUE)
+bls.raw <- xpathApply(bls.html, "//div/pre", xmlValue)
+bls.con <- textConnection(str_replace_all(as.character(bls.raw),
+                          'Â', ''))
+bls.data <- read.csv(bls.con, skip = 11)
+bls.data <- bls.data[,c(-length(names(bls.data)))]  # get rid of 'X' col
+
+rm(list = c('bls.query', 'bls.response', 'bls.html', 'bls.raw', 'bls.con'))
+```
+
+## Data munging
+These data only yield a complete series for the date range 1/1/1976 - 6/1/2010, inclusive. Before merging the three datasets together, we'll truncate them to ensure that they include only data in the date range above.
+```{r dates1}
+# FRED
+fred.data <- fred.data[fred.data$DATE <= '2010-06-01', ]
+names(fred.data) <- c('Month', 'SalesM')
+fred.data$Month <- ymd(fred.data$Month)  # Month to posix
+
+# NBER
+nber.data <- nber.data[nber.data$Month.Year >= '1976-01-01' &
+                         nber.data$Month.Year <= '2010-06-01',
+                       c(1, 3)]
+names(nber.data) <- c('Month', 'RGDP')
+nber.data$Month <- ymd(nber.data$Month)  # Month to posix
+```
+The BLS data will require a bit more work because of the 'long' format of the data, with each month included as a separate column:
+```{r bls.head}
+head(bls.data)
+```
+Before limiting the date range, we will need to build a single date column in YYYY-MM-DD format. Fortunately, the `tidyr` and `dplyr` packages make this a painless process.
+```{r dates2}
+# BLS
+# Create single Month column
+names(bls.data) <- c('Year', '01', '02', '03', '04', '05', '06', '07', '08',
+                     '09', '10', '11', '12')
+bls.data <- bls.data %>% gather(MonthNum, Unemployment, -Year) %>%
+  unite_('Month', c('Year', 'MonthNum'), sep = '-') %>% arrange(Month)
+bls.data$Month <- str_c(bls.data$Month, '-01')
+
+# limit date range
+bls.data <- bls.data[bls.data$Month <= '2010-06-01', ]
+bls.data$Month <- ymd(bls.data$Month)  # Month to posix
+```
+Finally, we merge the three datasets together using the `Reduce` function.
+```{r merge}
+# Merge data into single dataset
+data <- Reduce(function(...) merge(..., all = TRUE), 
+               list(fred.data, nber.data, bls.data))
+
+rm(bls.data, nber.data, fred.data)
+```
+Now the data look pretty good:
+```{r data.head}
+head(data)
+```
+In order to build a forecasting model, we will need lagged variants of the existing set of variables. As we decided in the [Data section](#Data), we will need three lags of each variable for the modeling below. The `zoo` package makes working with leads and lags straightforward.
+```{r lag}
+# create lags for each variable
+data.ts <- read.zoo(data)
+for (lag in 1:3) {
+  data[, c(str_c('L', lag, 'SalesM'),
+           str_c('L', lag, 'RGDP'), 
+           str_c('L', lag, 'Unemployment'))
+       ] <- stats::lag(data.ts, -lag, na.pad = TRUE)  # avoid dplyr::lag
+}
+
+rm(data.ts)
+
+# remove rows with NA
+data <- na.omit(data)
+
+rownames(data) <- data$Month
+data <- data[, -c(1, 3, 4)]  # remove Month column (since in rownames)
+```
+Our fully demunged and lagged data looks as follows:
+```{r data.final}
+head(data)
+```
+
+## Analysis
+We will proceed to train and evaluate three forecasting models and then return to the question of which factor is most important in predicting future auto sales.
+
+Before building the forecasting models, we need to first split the data into training and test samples. The training sample will be used for fitting the model and validation. We can then use the test sample to get a sense of how the model would perform on data it has not seen before. In this particular instance, we will set the last 20% of the data aside and use the first 80% of the data to train the models.
+```{r split}
+n <- dim(data)[1]
+in.test <- seq(n - (n %/% 10 * 2), n)  # integer division
+test <- data[in.test, ]
+train <- data[-in.test, ]
+```
+
+### Linear model
+We are now ready to train the first model, a linear regression model. This model was chosen as a sensible starting point due to its simplicity and parsimony. It should yield a good first order approximation of the relationship among the included variables, a benchmark we can use when looking at the more complex random forest models below.
+```{r linear}
+linear <- lm(SalesM ~ ., data = train)
+
+rm(list = c('n', 'in.test'))
+```
+To gauge the performance of this model, we will use two helper functions to calculate the mean standard error (MSE) and the 95% confidence interval (ie, estimated value +/- 1.96 * standard error).
+```{r helper}
+MSE <- function(actual, pred) {
+  error <- actual - pred
+  return(sum(error**2) / length(error))
+}
+
+SE_bounds <- function(pred, se) {
+  return(list(upper = pred + 1.96 * se, lower = pred - 1.96 * se))
+}
+```
+
+#### Linear model performance
+Using the test data, we can assess how the model might perform on 'new' data.
+```{r lm.perf, warning=FALSE}
+linfit <- predict(linear, newdata = test, se.fit = TRUE)
+lm.pred <- data.frame(date = rownames(data), actual = data$SalesM, 
+                      predicted = c(rep(NA, dim(data)[1] - length(linfit$fit)), 
+                                    linfit$fit),
+                      se_l = c(rep(NA, dim(data)[1] - length(linfit$fit)),
+                               SE_bounds(linfit$fit, linfit$se.fit)$lower),
+                      se_u = c(rep(NA, dim(data)[1] - length(linfit$fit)),
+                               SE_bounds(linfit$fit, linfit$se.fit)$upper))
+print(paste('Linear Model MSE:', round(MSE(test$SalesM, linfit$fit), 2)))
+
+tick.dates <- c('1976-04-01', '1980-01-01', '1985-01-01', '1990-01-01',
+                '1995-01-01', '2000-01-01', '2005-01-01', '2010-01-01')
+ggplot(lm.pred, aes(x = date, y = actual)) + geom_point(alpha = .7) + 
+  geom_point(aes(y = predicted), color = 'red', alpha = .7) +
+  scale_x_discrete(breaks = tick.dates) + 
+  geom_smooth(aes(y = predicted, ymin = se_l, ymax = se_u, group = 1), 
+              , color = 'red', linetype = 0 , stat = 'identity') +
+  labs(title = 'Linear model actual (black) and predicted (red) sales', x = 'Month', 
+       y = 'Auto Sales (m)')
+```
+
+We see from the above plot that the model appears to fit the test data rather well. The MSE figure will help us below to make comparisons in predictive performance across different models.
+
+### Random forests
+Before fitting a [random forest](http://en.wikipedia.org/wiki/Random_forest) model to the training data, we set up the processor clusters to accelerate the model fitting processes by taking advantage of the multicore processor on our machine. In my case, wehave four processing cores. Due to an apparent bug in the `caret` package, we will need to take a [few extra steps](http://stackoverflow.com/questions/24786089/parrf-on-caret-not-working-for-more-than-one-core) to set everything up.
+```{r parallel, results='hide'}
+cl <- makePSOCKcluster(4)
+clusterEvalQ(cl, library(foreach))
+registerDoParallel(cl)
+```
+To fit the random forest model, we will use 10-fold [cross validation](http://en.wikipedia.org/wiki/Cross-validation_(statistics)) on the training set to fit and tune the model. Once a final model has been selected, we will again use the test sample to evaluate its out-of-sample performance.
+```{r rf1}
+randForest <- train(SalesM ~ ., data = train, method = 'rf',
+                    trControl = trainControl(method = 'cv', number = 10),
+                    prox = TRUE, allowParallel = TRUE, importance = TRUE)
+```
+
+#### Random forest performance
+Let's see how the model performs on the test set.
+```{r rf1.perf, warning=FALSE}
+rf.fit <- predict(randForest, test)
+print(paste('Random Forest MSE:', round(MSE(test$SalesM, rf.fit), 2)))
+
+rf.pred <- data.frame(Month = rownames(data), actual = data$SalesM,
+                      predicted = c(rep(NA, dim(data)[1] - length(rf.fit)), 
+                                        rf.fit))
+ggplot(rf.pred, aes(x = Month, y = actual)) + geom_point(alpha = .7) + 
+  geom_point(aes(y = predicted), color = 'red', alpha = .7) +
+  scale_x_discrete(breaks = tick.dates) + 
+  labs(title = 'Cross-validated random forest actual (black) and predicted (red) sales', 
+       x = 'Month', y = 'Auto Sales (m)')
+```
+
+Surprisingly, the linear model appears to predict more accurately! Visual inspection confirms what the higher MSE score tells us: the random forest model predicted observations do not track the realized sales values as well as the linear model.
+
+### Random forests with time slices
+There is some evidence that standard cross validation, which randomly partitions the data into training and test sets, does not work as well for sequential data or data with a time component. Here, we will apply a different splitting method, essentially splitting the data on a rolling basis and using the resulting mini data sets to train and calibrate the model. This new approaach is reflected in the `trControl = trainControl(method = 'timeslice', ...)` argument passed to the `train` method. (Since we will not be fitting any additional models, we can close the connection to the different processing cores.)
+```{r rf2}
+randForest2 <- train(SalesM ~ ., data = train, method = 'rf',
+                 trControl = trainControl(method = 'timeslice',
+                                          initialWindow = 50,
+                                          horizon = 15,
+                                          fixedWindow = TRUE),
+                 prox = TRUE, allowParallel = TRUE, importance = TRUE)
+stopCluster(cl)
+```
+
+#### Random forest with time slices performance
+Hopefully, the new data splits will improve model performance over the vanilla cross-validated random forest model.
+```{r rf2.perf, warning=FALSE}
+rf.fit2 <- predict(randForest2, test)
+print(paste('Random Forest with time slicing MSE:',
+            round(MSE(test$SalesM, rf.fit2), 2)))
+
+rf.pred2 <- data.frame(Month = rownames(data), actual = data$SalesM,
+                      predicted = c(rep(NA, dim(data)[1] - length(rf.fit2)), 
+                                        rf.fit2))
+ggplot(rf.pred2, aes(x = Month, y = actual)) + geom_point(alpha = .7) + 
+  geom_point(aes(y = predicted), color = 'red', alpha = .7) +
+  scale_x_discrete(breaks = tick.dates) + 
+  labs(title = 'Time-sliced random forest actual (black) and predicted (red) sales',
+       x = 'Month', y = 'Auto Sales (m)')
+```
+
+Both the MSE and the chart demonstrate unequivocally the improvement in the model performance out of sample. However, the linear model still outperforms the much more computationally intensive random forest model.
+
+### Driver of auto sales
+So which of these variables seems to be most influential for predicting auto sales? To answer this question, we will look at variable statistics for each of the models above.
+
+In the case of the linear model, we can use the size of the coefficient as an indicator of how important a variable is for predicting sales, provided that we are confident in the accuracy of the estimate (ie, taking into account the standard errors).
+
+For random forest models, we will use the mean increase in MSE as the primary measure of variable importance. A detailed description of the statistic is available on [Wikipedia](http://en.wikipedia.org/wiki/Random_forest#Variable_importance) or in the [caret documentation](http://cran.r-project.org/web/packages/randomForest/randomForest.pdf). 
+
+Note that the output below includes another measure of variable importance, node purity. Change in node purity and the above measure do not necessarily correspond. Since we are examining different lags of the same (persistent) variables, the former measure assesses a variable's importance while taking into account the impact of other lags, whereas the latter does not. Hence, we'll the former.
+```{r vars}
+rf.imp <- importance(randForest$finalModel)
+rf2.imp <- importance(randForest2$finalModel)
+print(summary(linear))
+print(rf.imp[order(rf.imp[,1], decreasing = TRUE),])
+print(rf2.imp[order(rf2.imp[,1], decreasing = TRUE),])
+```
+
+The linear model suggests that the previous month's sales is a strong predictor on this month's sales, as we might expect of a highly persisent time series. The previous month's unemployment is also an important predictor of this month's sales, though the estimated coefficient is less precise.
+
+Both random forest models support the evidence in the linear model regarding the importance of the first lag of sales. Interestingly, they also rank the impact of real GDP more highly than unemployment.
+
+In the end, the only thing we can say with any confidence is that the first lag of sales is an important predictor for the next month's sales. Whether unemployment or real GDP is a better predictor of future sales is less clear.
+
+## Auto sales this month
+What is the predicted volume of auto sales this month (December 2014) according to these models? Unfortunately, Stock-Watson RGDP figures are not available after 2010, so the data below uses completely fabricated RGDP numbers below. (Some ad hoc testing showed that the random forest models are not particularly sensitive to the magnitude of any of the RGDP variables.)
+```{r dec.sales}
+new.data <- list(L1SalesM = 17.5,
+                 L1RGDP = 14000,
+                 L1Unemployment = 5.9,
+                 L2SalesM = 16.8,
+                 L2RGDP = 14000,
+                 L2Unemployment = 5.8,
+                 L3SalesM = 16.8,
+                 L3RGDP = 14000,
+                 L3Unemployment = 5.8)
+predict(linear, new.data)
+predict(randForest, new.data)
+predict(randForest2, new.data)
+```
+It looks like the three models more or less agree that roughly 17m cars will be sold in December. My gut tells me that this number might overshoot, especially since weam not sure whether these model will adequately take into account seasonality of sales.
