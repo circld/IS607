@@ -67,7 +67,7 @@ fred.query <- list('form[native_frequency]' = 'Monthly',
                     'form[aggregation]' = 'Average',
                     sep = '&')
 ```
-To avoid having to save a hardcopy file, the content of the HTTP request is passed as to read.table as a text connection, allowing `read.table` to create a data frame directly from text. As a final step, we clean up any variables that are not relevant for the subsequent processing.
+To avoid having to save a hardcopy file, the content of the HTTP request is passed to read.table as a text connection, allowing `read.table` to create a data frame directly from text. As a final step, we clean up any variables that are not relevant for the subsequent processing.
 ```{r fred2}
 fred.response <- POST(fred.url, body = fred.query)
 fred.con <- textConnection(content(fred.response, 'text'))
@@ -78,7 +78,7 @@ rm(list = c('fred.query', 'fred.response', 'fred.con'))
 ```
 
 ### Real GDP data
-Real GDP (RGDP) data is hosted as an Excel file, which complicates things a bit. To get the data in, we download the file to disk (the user will be prompted to choose where to save the data) and use the `xlsx` R package to read it in.
+Real GDP (RGDP) data is hosted as an Excel file, which complicates things a bit. To get the data in, we download the file to disk (the user will be prompted to choose where to save the data) and use the `xlsx` R package to read it into R.
 ```{r nber}
 nber.url <- 'http://www.nber.org/cycles/BCDCFiguresData100920_ver5.xlsx'
 nber.dir <- choose.dir(caption = 'Select directory in which to save NBER data.')
@@ -355,7 +355,7 @@ print(rf2.imp[order(rf2.imp[,1], decreasing = TRUE),])
 
 Both random forest models support the evidence in the linear model regarding the importance of the first lag of sales. Interestingly, they also rank the impact of real GDP more highly than unemployment.
 
-In sum, the first lag of sales is an important predictor for the next month's sales. Lagged RGDPmay also have predictive power, although in the linear model, only the second lag was significant at the 5% level. Whether real GDP really is a better predictor of future sales than unemployment is not completely clear, though there is some evidence that it is.
+In sum, the first lag of sales is an important predictor for the next month's sales. Lagged RGDP may also have predictive power, although in the linear model, only the second lag was significant at the 5% level. Whether real GDP really is a better predictor of future sales than unemployment is not completely clear, though there is some evidence that it is.
 
 ## Auto sales this month
 Since we have these three models trained and ready to go, let's have a bit of fun and predict the volume of auto sales this month (December 2014). Unfortunately, Stock-Watson RGDP figures are not available after 2010, so the data below uses completely fabricated RGDP numbers below. (Some ad hoc testing showed that the random forest models are not particularly sensitive to the magnitude of any of the RGDP variables.)
