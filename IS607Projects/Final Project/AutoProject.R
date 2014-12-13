@@ -189,8 +189,8 @@ print(paste('Random Forest MSE:', round(MSE(test$SalesM, rf.fit), 2)))
 rf.pred <- data.frame(Month = rownames(data), actual = data$SalesM,
                       predicted = c(rep(NA, dim(data)[1] - length(rf.fit)), 
                                         rf.fit))
-ggplot(rf.pred, aes(x = Month, y = actual)) + geom_point(alpha = .8) + 
-  geom_point(aes(y = predicted), color = 'red', alpha = .8) +
+ggplot(rf.pred, aes(x = Month, y = actual)) + geom_point(alpha = .7) + 
+  geom_point(aes(y = predicted), color = 'red', alpha = .7) +
   scale_x_discrete(breaks = tick.dates) + 
   labs(title = 'Cross-validated Random Forest Actual (black) and predicted (red) auto sales', 
        x = 'Month', y = 'Auto Sales (m)')
@@ -210,8 +210,8 @@ print(paste('Random Forest with time slicing MSE:',
 rf.pred2 <- data.frame(Month = rownames(data), actual = data$SalesM,
                       predicted = c(rep(NA, dim(data)[1] - length(rf.fit2)), 
                                         rf.fit2))
-ggplot(rf.pred2, aes(x = Month, y = actual)) + geom_point(alpha = .8) + 
-  geom_point(aes(y = predicted), color = 'red', alpha = .8) +
+ggplot(rf.pred2, aes(x = Month, y = actual)) + geom_point(alpha = .7) + 
+  geom_point(aes(y = predicted), color = 'red', alpha = .7) +
   scale_x_discrete(breaks = tick.dates) + 
   labs(title = 'Time-sliced Random Forest Actual (black) and predicted (red) auto sales',
        x = 'Month', y = 'Auto Sales (m)')
@@ -223,7 +223,24 @@ zscore <- function(num.vect) {
 linear.scaled <- lm(SalesM ~ ., data = as.data.frame(apply(train, 2, zscore)))
 rf.imp <- importance(randForest$finalModel)
 rf2.imp <- importance(randForest2$finalModel)
-print(summary(linear.scaled))
+
+# chart of coefficients (with SE)
+lin.coef <- data.frame(summary(linear.scaled)$coefficients)[-1, ]
+colnames(lin.coef) <- c('Est', 'SE', 't', 'p-val')
+lin.coef$Est <- abs(lin.coef$Est)
+# reorder variables for visual clarity
+new.order <- c('L1SalesM', 'L2SalesM', 'L3SalesM', 
+               'L1RGDP', 'L2RGDP', 'L3RGDP', 
+               'L1Unemployment', 'L2Unemployment', 'L3Unemployment')
+ggplot(lin.coef, aes(x = rownames(lin.coef), y = Est)) + 
+  geom_pointrange(stat='identity', 
+                  aes(ymax = SE_bounds(lin.coef$Est, lin.coef$SE)[[1]], 
+                      ymin = SE_bounds(lin.coef$Est, lin.coef$SE)[[2]])) +
+  labs(title = 'Linear model coefficients',
+       x = 'Variable', y = 'Magnitude (abs. value) & precision') +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_x_discrete(limits = new.order)
+
 print(rf.imp[order(rf.imp[,1], decreasing = TRUE),])
 print(rf2.imp[order(rf2.imp[,1], decreasing = TRUE),])
 
@@ -241,10 +258,10 @@ new.data <- list(L1SalesM = 17.5,
                  L3RGDP = 14000,
                  L3Unemployment = 5.8)
 writeLines('\n')
-print(paste('Linear model prediction:', predict(linear, new.data)))
-print(paste('Random forest naive prediction:', predict(randForest, new.data)))
+print(paste('Linear model prediction:', round(predict(linear, new.data), 2)))
+print(paste('Random forest naive prediction:', round(predict(randForest, new.data), 2)))
 print(paste('Random forest time slice prediction:',
-            predict(randForest2, new.data)))
+            round(predict(randForest2, new.data), 2)))
 
 # ~17m cars sold in December
 # my guess--overshoots, not sure these model will reflect seasonal trends

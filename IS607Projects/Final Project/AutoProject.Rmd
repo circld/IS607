@@ -1,5 +1,11 @@
-# What drives auto sales?
-Paul Garaud
+---
+title: "What predicts auto sales?"
+author: Paul Garaud
+output:
+  html_document:
+    toc: true
+    theme: flatly
+---
 
 ## Motivation
 Over the past few months, I have noticed a remarkable number of cars driving around Denver without license plates. The number of new cars on the road raised a number of questions:
@@ -21,13 +27,13 @@ This project will look at the last question using publicly available national da
 
 ### Variables
 <a name='Data'></a>
-Due to limitations in data availability and time, we will include only three variables in the analyses below. These are:
+Though there are many other variables that should probably be included in the analysis below (eg, population growth, gas prices, etc), due to limitations in data availability and time, we will include only lags of three variables. These three variables are:
 
 * Sales of automobiles (in millions)
 * Real GDP (Stock-Watson Index)
 * Unemployment rate
 
-As with many time series, car sales may be expected to be persisent; in other words, last month's car sales volume will be 'similar' to this month's sales figure. Hence, prior month sales will be used to train the forecasting models below. Real GDP is included to capture economic growth. Finally, the unemployment rate measures another aspect of people's economic well-being and will also be included as a predictor. 
+As with many time series, car sales may be expected to be persisent; in other words, last month's car sales volume will be 'similar' to this month's sales figure. Hence, prior month sales will be used for training the forecasting models. Real GDP is included to capture economic growth. Finally, the unemployment rate measures another aspect of people's economic well-being and will also be included as a predictor. 
 
 While these last two factors may overlap to some extent, they are in fact distinct from each other and, as the jobless recovery following the Great Recession demonstrates, they do not necessarily track one another.
 
@@ -195,14 +201,13 @@ n <- dim(data)[1]
 in.test <- seq(n - (n %/% 10 * 2), n)  # integer division
 test <- data[in.test, ]
 train <- data[-in.test, ]
+rm(list = c('n', 'in.test'))
 ```
 
 ### Linear model
 We are now ready to train the first model, a linear regression model. This model was chosen as a sensible starting point due to its simplicity and parsimony. It should yield a good first order approximation of the relationship among the included variables, a benchmark we can use when looking at the more complex random forest models below.
 ```{r linear}
 linear <- lm(SalesM ~ ., data = train)
-
-rm(list = c('n', 'in.test'))
 ```
 To gauge the performance of this model, we will use two helper functions to calculate the mean standard error (MSE) and the 95% confidence interval (ie, estimated value +/- 1.96 * standard error).
 ```{r helper}
@@ -311,27 +316,46 @@ So which of these variables seems to be most influential for predicting auto sal
 
 In the case of the linear model, we will need to center and scale the variables and fit the model again to ensure that the variables are of comparable units (or rather, unit-less). This way, we can use the size of the coefficient as an indicator of how important a variable is for predicting sales, provided that we are confident in the accuracy of the estimate (ie, taking into account the standard errors).
 
-For random forest models, we will use the mean increase in MSE as the primary measure of variable importance. A detailed description of the statistic is available on [Wikipedia](http://en.wikipedia.org/wiki/Random_forest#Variable_importance) or in the [caret documentation](http://cran.r-project.org/web/packages/randomForest/randomForest.pdf). 
-
-Note that the output below includes another measure of variable importance, node purity. Change in node purity and the above measure do not necessarily correspond. Since we are examining different lags of the same (persistent) variables, the former measure assesses a variable's importance while taking into account the impact of other lags, whereas the latter does not. Hence, we'll use the former.
-```{r vars}
+```{r lm.vars}
 zscore <- function(num.vect) {
   return((num.vect - mean(num.vect)) / sd(num.vect))
 }
-
 linear.scaled <- lm(SalesM ~ ., data = as.data.frame(apply(train, 2, zscore)))
-rf.imp <- importance(randForest$finalModel)
-rf2.imp <- importance(randForest2$finalModel)
-print(summary(linear.scaled))
-print(rf.imp[order(rf.imp[,1], decreasing = TRUE),])
-print(rf2.imp[order(rf2.imp[,1], decreasing = TRUE),])
+
+# chart of coefficients (with SE)
+lin.coef <- data.frame(summary(linear.scaled)$coefficients)[-1, ]
+colnames(lin.coef) <- c('Est', 'SE', 't', 'p-val')
+lin.coef$Est <- abs(lin.coef$Est)
+new.order <- c('L1SalesM', 'L2SalesM', 'L3SalesM', 
+               'L1RGDP', 'L2RGDP', 'L3RGDP', 
+               'L1Unemployment', 'L2Unemployment', 'L3Unemployment')
+ggplot(lin.coef, aes(x = rownames(lin.coef), y = Est)) + 
+  geom_pointrange(stat='identity', 
+                  aes(ymax = SE_bounds(lin.coef$Est, lin.coef$SE)[[1]], 
+                      ymin = SE_bounds(lin.coef$Est, lin.coef$SE)[[2]])) +
+  labs(title = 'Linear model coefficients',
+       x = 'Variable', y = 'Magnitude (abs. value) & precision') +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_x_discrete(limits = new.order)
 ```
 
 The linear model suggests that the previous month's sales is a strong predictor on this month's sales, as we might expect of a highly persisent time series. The previous month's unemployment is also an important predictor of this month's sales, though the estimated coefficient is less precise. Finally, the two-month lag of RGDP appears to have the most sizeable impact on sales.
 
+For random forest models, we will use the mean increase in MSE as the primary measure of variable importance. A detailed description of the statistic is available on [Wikipedia](http://en.wikipedia.org/wiki/Random_forest#Variable_importance) or in the [caret documentation](http://cran.r-project.org/web/packages/randomForest/randomForest.pdf). 
+
+Note that the output below includes another measure of variable importance, node purity. Change in node purity and the above measure do not necessarily correspond. Since we are examining different lags of the same (persistent) variables, the former measure assesses a variable's importance while taking into account the impact of other lags, whereas the latter does not. Hence, we'll use the former.
+
+```{r rf.vars}
+rf.imp <- importance(randForest$finalModel)
+rf2.imp <- importance(randForest2$finalModel)
+# print variable importance sorted on %IncMSE
+print(rf.imp[order(rf.imp[,1], decreasing = TRUE),])
+print(rf2.imp[order(rf2.imp[,1], decreasing = TRUE),])
+```
+
 Both random forest models support the evidence in the linear model regarding the importance of the first lag of sales. Interestingly, they also rank the impact of real GDP more highly than unemployment.
 
-In sum, the first lag of sales is an important predictor for the next month's sales. Lagged RGDPmay also have predictive power, although in the linear model, only the second lag was significant at the 5% level. Whether real GDP really is a better predictor of future sales than unemployment is not completely clear, though there is some suggestive evidence that in support of this position.
+In sum, the first lag of sales is an important predictor for the next month's sales. Lagged RGDPmay also have predictive power, although in the linear model, only the second lag was significant at the 5% level. Whether real GDP really is a better predictor of future sales than unemployment is not completely clear, though there is some evidence that it is.
 
 ## Auto sales this month
 Since we have these three models trained and ready to go, let's have a bit of fun and predict the volume of auto sales this month (December 2014). Unfortunately, Stock-Watson RGDP figures are not available after 2010, so the data below uses completely fabricated RGDP numbers below. (Some ad hoc testing showed that the random forest models are not particularly sensitive to the magnitude of any of the RGDP variables.)
