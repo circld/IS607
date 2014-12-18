@@ -232,7 +232,6 @@ lm.pred <- data.frame(date = rownames(data), actual = data$SalesM,
                                SE_bounds(linfit$fit, linfit$se.fit)$lower),
                       se_u = c(rep(NA, dim(data)[1] - length(linfit$fit)),
                                SE_bounds(linfit$fit, linfit$se.fit)$upper))
-print(paste('Linear Model MSE:', round(MSE(test$SalesM, linfit$fit), 2)))
 
 tick.dates <- c('1976-04-01', '1980-01-01', '1985-01-01', '1990-01-01',
                 '1995-01-01', '2000-01-01', '2005-01-01', '2010-01-01')
@@ -243,6 +242,7 @@ ggplot(lm.pred, aes(x = date, y = actual)) + geom_point(alpha = .7) +
               , color = 'red', linetype = 0 , stat = 'identity') +
   labs(title = 'Linear model actual (black) and predicted (red) sales', x = 'Month', 
        y = 'Auto Sales (m)')
+print(paste('Linear Model MSE:', round(MSE(test$SalesM, linfit$fit), 2)))
 ```
 
 We see from the above plot that the model appears to fit the test data rather well. The MSE figure will help us below to make comparisons in predictive performance across different models.
@@ -265,7 +265,6 @@ randForest <- train(SalesM ~ ., data = train, method = 'rf',
 Let's see how the model performs on the test set.
 ```{r rf1.perf, warning=FALSE}
 rf.fit <- predict(randForest, test)
-print(paste('Random Forest MSE:', round(MSE(test$SalesM, rf.fit), 2)))
 
 rf.pred <- data.frame(Month = rownames(data), actual = data$SalesM,
                       predicted = c(rep(NA, dim(data)[1] - length(rf.fit)), 
@@ -275,6 +274,7 @@ ggplot(rf.pred, aes(x = Month, y = actual)) + geom_point(alpha = .7) +
   scale_x_discrete(breaks = tick.dates) + 
   labs(title = 'Cross-validated random forest actual (black) and predicted (red) sales', 
        x = 'Month', y = 'Auto Sales (m)')
+print(paste('Random Forest MSE:', round(MSE(test$SalesM, rf.fit), 2)))
 ```
 
 Surprisingly, the linear model appears to predict more accurately! Visual inspection confirms what the higher MSE score tells us: the random forest model predicted observations do not track the realized sales values as well as the linear model.
@@ -295,8 +295,6 @@ stopCluster(cl)
 Hopefully, the new data splits will improve model performance over the vanilla cross-validated random forest model.
 ```{r rf2.perf, warning=FALSE}
 rf.fit2 <- predict(randForest2, test)
-print(paste('Random Forest with time slicing MSE:',
-            round(MSE(test$SalesM, rf.fit2), 2)))
 
 rf.pred2 <- data.frame(Month = rownames(data), actual = data$SalesM,
                       predicted = c(rep(NA, dim(data)[1] - length(rf.fit2)), 
@@ -306,6 +304,8 @@ ggplot(rf.pred2, aes(x = Month, y = actual)) + geom_point(alpha = .7) +
   scale_x_discrete(breaks = tick.dates) + 
   labs(title = 'Time-sliced random forest actual (black) and predicted (red) sales',
        x = 'Month', y = 'Auto Sales (m)')
+print(paste('Random Forest with time slicing MSE:',
+            round(MSE(test$SalesM, rf.fit2), 2)))
 ```
 
 Both the MSE and the chart demonstrate unequivocally the improvement in the model performance out of sample. However, the linear model still outperforms the much more computationally intensive random forest model.
